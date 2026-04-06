@@ -1,4 +1,4 @@
-﻿import type { HomePageViewModel } from './homePageModel'
+import type { HomePageViewModel } from './homePageModel'
 
 export const homePageData: HomePageViewModel = {
   utilityBar: {
@@ -17,7 +17,7 @@ export const homePageData: HomePageViewModel = {
   ],
   loginLink: {
     label: 'Đăng nhập',
-    href: '/login',
+    href: '?portal=student&page=dashboard',
   },
   hero: {
     eyebrow: 'HỆ THỐNG ĐÁNH GIÁ HỌC TẬP BẰNG AI',
@@ -27,7 +27,7 @@ export const homePageData: HomePageViewModel = {
       'Hỗ trợ giảng viên giao bài, đánh giá theo tiêu chí và phản hồi học tập trên một nền tảng thống nhất cho toàn lớp.',
     actions: [
       { label: 'Đăng nhập giảng viên', href: '/login?role=lecturer', variant: 'primary' },
-      { label: 'Đăng nhập sinh viên', href: '/login?role=student', variant: 'secondary' },
+      { label: 'Đăng nhập sinh viên', href: '?portal=student&page=dashboard', variant: 'secondary' },
     ],
     guideLink: {
       label: 'Xem hướng dẫn sử dụng',
@@ -80,7 +80,8 @@ export const homePageData: HomePageViewModel = {
   footer: {
     systemName: 'ĐẠI HỌC BÁCH KHOA HÀ NỘI',
     systemSubtitle: 'Hệ thống đánh giá học tập thông minh',
-    description: 'Nền tảng hỗ trợ giao bài, nộp bài, chấm điểm và phản hồi học tập cho giảng viên và sinh viên.',
+    description:
+      'Nền tảng hỗ trợ giao bài, nộp bài, chấm điểm và phản hồi học tập cho giảng viên và sinh viên.',
     quickLinks: [
       { label: 'Trang chủ', href: '#' },
       { label: 'Thông báo', href: '#thong-bao' },

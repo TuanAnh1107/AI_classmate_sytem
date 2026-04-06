@@ -99,7 +99,7 @@
 
 .site-header-surface {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   width: 100%;
   background: linear-gradient(90deg, #7f0b28 0%, #9d1031 42%, #b91940 100%);
 }
