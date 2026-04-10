@@ -5,14 +5,22 @@ type ResultBreakdownCardProps = {
 }
 
 export function ResultBreakdownCard({ item }: ResultBreakdownCardProps) {
+  const achievedCount = item.rubric.filter((rubric) => rubric.achieved).length
+
   return (
     <article className="result-breakdown-card">
-      <header>
+      <header className="result-breakdown-head">
         <div>
           <p>{item.questionLabel}</p>
           <h3>
             {item.score}/{item.maxScore} điểm
           </h3>
+        </div>
+        <div className="result-breakdown-score">
+          <strong>
+            {achievedCount}/{item.rubric.length}
+          </strong>
+          <span>tiêu chí đạt</span>
         </div>
       </header>
 

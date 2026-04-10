@@ -1,19 +1,28 @@
 import type { DashboardFeedbackItem } from '../../../controllers/student/useStudentDashboardController'
-import type { QuickGuideEntry, StudentReminder } from '../../../models/student/student.types'
+import type { QuickGuideEntry, StudentNotification, StudentReminder } from '../../../models/student/student.types'
+import { buildStudentPortalHref, formatPortalDateTime } from '../../../models/student/student.mappers'
 
 type StudentReminderPanelProps = {
   reminders: StudentReminder[]
   feedbackUpdates: DashboardFeedbackItem[]
   guideLinks: QuickGuideEntry[]
+  quickActions: QuickGuideEntry[]
+  notifications: StudentNotification[]
 }
 
-export function StudentReminderPanel({ reminders, feedbackUpdates, guideLinks }: StudentReminderPanelProps) {
+export function StudentReminderPanel({
+  reminders,
+  feedbackUpdates,
+  guideLinks,
+  quickActions,
+  notifications,
+}: StudentReminderPanelProps) {
   return (
     <div className="portal-aside-stack">
       <section className="portal-aside-card">
         <header>
           <h3>Nhắc việc hôm nay</h3>
-          <p>Những đầu việc nên xử lý trong buổi học hiện tại.</p>
+          <p>Những đầu việc nên xử lý ngay trong buổi học hiện tại.</p>
         </header>
         <ul className="aside-check-list">
           {reminders.map((item) => (
@@ -35,6 +44,35 @@ export function StudentReminderPanel({ reminders, feedbackUpdates, guideLinks }:
             <li key={item.id}>
               <a href={item.href}>{item.title}</a>
               <span>{item.updatedAtLabel}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="portal-aside-card">
+        <header>
+          <h3>Thông báo học vụ</h3>
+          <p>Các cập nhật từ lớp học và hệ thống.</p>
+        </header>
+        <ul className="aside-link-list">
+          {notifications.map((item) => (
+            <li key={item.id}>
+              <a href={buildStudentPortalHref('notifications', { view: item.isRead ? 'read' : 'unread' })}>{item.content}</a>
+              <span>{formatPortalDateTime(item.createdAt)}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="portal-aside-card">
+        <header>
+          <h3>Tác vụ nhanh</h3>
+          <p>Đi thẳng tới các khu vực cần xử lý.</p>
+        </header>
+        <ul className="aside-link-list">
+          {quickActions.map((item) => (
+            <li key={item.id}>
+              <a href={item.href}>{item.label}</a>
             </li>
           ))}
         </ul>

@@ -15,6 +15,21 @@ export interface PortalNavItem {
   label: string
   href: string
   isActive?: boolean
+  badgeCount?: number
+  kind?: 'link' | 'notifications'
+  previewTitle?: string
+  previewDescription?: string
+  previewHref?: string
+  previewEmptyText?: string
+  previewItems?: PortalNotificationPreview[]
+}
+
+export interface PortalNotificationPreview {
+  id: string
+  content: string
+  createdAtLabel: string
+  isRead: boolean
+  href: string
 }
 
 export interface HeaderUserMenuModel {
@@ -42,6 +57,23 @@ export interface SecondaryTabModel {
   label: string
   href: string
   isActive?: boolean
+}
+
+export interface PortalShellModel {
+  utilityBar: UtilityBarModel
+  brandName: string
+  brandSubtitle: string
+  navItems: PortalNavItem[]
+  userMenu?: HeaderUserMenuModel
+  footer: FooterModel
+}
+
+export interface PortalPageFrame {
+  shell: PortalShellModel
+  pageTitle: string
+  pageDescription: string
+  breadcrumbs: BreadcrumbItemModel[]
+  tabs?: SecondaryTabModel[]
 }
 
 export type DataState = 'ready' | 'loading' | 'empty' | 'error'

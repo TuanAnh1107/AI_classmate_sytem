@@ -1,34 +1,76 @@
-import type { DataState } from '../../models/shared/portal.types'
-import type {
-  AssignmentFilter,
-  StudentAssignmentRow,
-  StudentPageFrame,
-} from '../../models/student/student.types'
-import { studentAssignmentsMock, studentClassesMock } from '../../models/student/student.mock'
+import type { DataState, StatusTone } from '../../models/shared/portal.types'
+import type { AssignmentFilter, AssignmentSort, StudentPageFrame } from '../../models/student/student.types'
 import {
-  buildFilterHref,
+  feedbackThreadsMock,
+  studentAssignmentsMock,
+  studentClassesMock,
+  studentProfileMock,
+  studentResultsMock,
+} from '../../models/student/student.mock'
+import {
   buildStudentPortalHref,
   formatPortalDateTime,
-  getAssignmentFilterLabel,
   getClassLabel,
   getCompletionLabel,
   getGradingStatusMeta,
   getSubmissionStatusMeta,
 } from '../../models/student/student.mappers'
+import { canStudentViewAssignment } from '../../services/domain/accessControl'
 import { useStudentPortalShellController } from './useStudentPortalShellController'
+import { useStudentQueryParams } from './useStudentQueryParams'
 
 export interface AssignmentFilterChip {
   key: AssignmentFilter
   label: string
   href: string
   isActive: boolean
+  count: number
+}
+
+export interface StudentAssignmentClassCard {
+  id: string
+  code: string
+  name: string
+  lecturerName: string
+  helperText: string
+  openAssignmentsLabel: string
+  progressLabel: string
+  href: string
+  isActive: boolean
+}
+
+export interface StudentAssignmentListItem {
+  id: string
+  title: string
+  classLabel: string
+  summary: string
+  deadlineLabel: string
+  deadlineTone: StatusTone
+  statusLabel: string
+  statusTone: StatusTone
+  scoreLabel?: string
+  primaryActionLabel: string
+  primaryActionHref: string
+  secondaryActionHref: string
+  secondaryActionLabel: string
 }
 
 export interface StudentAssignmentsViewModel {
   state: DataState
   frame: StudentPageFrame
+  classes: StudentAssignmentClassCard[]
+  selectedClass?: {
+    id: string
+    title: string
+    lecturerName: string
+    overview: string
+  }
   filters: AssignmentFilterChip[]
-  rows: StudentAssignmentRow[]
+  rows: StudentAssignmentListItem[]
+  searchValue: string
+  sortValue: AssignmentSort
+  onSearchChange: (value: string) => void
+  onSortChange: (value: AssignmentSort) => void
   errorMessage?: string
 }
 
@@ -40,10 +82,13 @@ export interface StudentAssignmentDetailViewModel {
     title: string
     classLabel: string
     deadlineLabel: string
+    dueAt: string
+    allowLateSubmission: boolean
+    assignmentStatus: typeof studentAssignmentsMock[number]['status']
     submissionLabel: string
-    submissionTone: StudentAssignmentRow['submissionTone']
+    submissionTone: StatusTone
     gradingLabel: string
-    gradingTone: StudentAssignmentRow['gradingTone']
+    gradingTone: StatusTone
     instructions: string[]
     questions: typeof studentAssignmentsMock[number]['questions']
     requirements: typeof studentAssignmentsMock[number]['requirements']
@@ -51,26 +96,110 @@ export interface StudentAssignmentDetailViewModel {
     completionLabel: string
     draftSavedAtLabel?: string
     submittedAtLabel?: string
+    description: string
+    resourceLinks: typeof studentAssignmentsMock[number]['resourceLinks']
+    feedbackMessages: typeof feedbackThreadsMock[number]['messages']
+    resultSummary?: {
+      totalScore: number
+      maxScore: number
+      lecturerFeedback: string
+      updatedAtLabel: string
+      resultHref: string
+    }
   }
   errorMessage?: string
 }
 
-const assignmentFilters: AssignmentFilter[] = ['all', 'not_submitted', 'submitted', 'late', 'graded']
+const assignmentFilters: AssignmentFilter[] = ['not_submitted', 'submitted', 'overdue']
 
 function matchesFilter(filter: AssignmentFilter, assignment: typeof studentAssignmentsMock[number]) {
+  const dueTime = new Date(assignment.dueAt).getTime()
+  const isOverdue = dueTime < Date.now() && (assignment.submissionStatus === 'not_submitted' || assignment.submissionStatus === 'draft')
+
   switch (filter) {
     case 'not_submitted':
-      return assignment.submissionStatus === 'not_submitted' || assignment.submissionStatus === 'draft'
+      return !isOverdue && (assignment.submissionStatus === 'not_submitted' || assignment.submissionStatus === 'draft')
     case 'submitted':
-      return assignment.submissionStatus === 'submitted'
-    case 'late':
-      return assignment.submissionStatus === 'late'
-    case 'graded':
-      return assignment.gradingStatus === 'published'
+      return assignment.submissionStatus === 'submitted' || assignment.submissionStatus === 'late'
+    case 'overdue':
+      return isOverdue
     case 'all':
     default:
       return true
   }
+}
+
+function sortAssignments(sort: AssignmentSort, assignments: typeof studentAssignmentsMock) {
+  const sorted = [...assignments]
+
+  switch (sort) {
+    case 'deadline':
+      sorted.sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())
+      break
+    case 'status':
+      sorted.sort((a, b) => a.submissionStatus.localeCompare(b.submissionStatus))
+      break
+    case 'recent':
+    default:
+      sorted.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      break
+  }
+
+  return sorted
+}
+
+function getAssignmentDisplayMeta(assignment: typeof studentAssignmentsMock[number]) {
+  const dueTime = new Date(assignment.dueAt).getTime()
+  const isOverdue = dueTime < Date.now() && (assignment.submissionStatus === 'not_submitted' || assignment.submissionStatus === 'draft')
+  const result = studentResultsMock.find((item) => item.assignmentId === assignment.id)
+
+  if (isOverdue) {
+    return {
+      statusLabel: 'Quá hạn',
+      statusTone: 'danger' as StatusTone,
+      primaryActionLabel: 'Xem chi tiết',
+      primaryActionHref: buildStudentPortalHref('assignment-detail', { assignmentId: assignment.id }),
+    }
+  }
+
+  if (result) {
+    return {
+      statusLabel: `Điểm ${result.totalScore.toFixed(1)}/${result.maxScore}`,
+      statusTone: 'success' as StatusTone,
+      primaryActionLabel: 'Xem kết quả',
+      primaryActionHref: buildStudentPortalHref('result-detail', { resultId: result.id }),
+    }
+  }
+
+  if (assignment.submissionStatus === 'submitted' || assignment.submissionStatus === 'late') {
+    return {
+      statusLabel: 'Chưa có điểm',
+      statusTone: 'info' as StatusTone,
+      primaryActionLabel: 'Xem chi tiết',
+      primaryActionHref: buildStudentPortalHref('assignment-detail', { assignmentId: assignment.id }),
+    }
+  }
+
+  return {
+    statusLabel: 'Chưa nộp',
+    statusTone: 'warning' as StatusTone,
+    primaryActionLabel: assignment.submissionStatus === 'draft' ? 'Tiếp tục nộp bài' : 'Xem chi tiết',
+    primaryActionHref:
+      assignment.submissionStatus === 'draft'
+        ? buildStudentPortalHref('assignment-submit', { assignmentId: assignment.id })
+        : buildStudentPortalHref('assignment-detail', { assignmentId: assignment.id }),
+  }
+}
+
+function getDeadlineTone(dueAt: string): StatusTone {
+  const diff = new Date(dueAt).getTime() - Date.now()
+  if (diff < 0) {
+    return 'danger'
+  }
+  if (diff <= 1000 * 60 * 60 * 24 * 3) {
+    return 'warning'
+  }
+  return 'neutral'
 }
 
 export function useStudentAssignmentsController(
@@ -78,67 +207,184 @@ export function useStudentAssignmentsController(
   activeFilter: AssignmentFilter,
 ): StudentAssignmentsViewModel {
   const shell = useStudentPortalShellController('assignments')
+  const { query, setQuery } = useStudentQueryParams()
+  const safeSort: AssignmentSort =
+    query.sort === 'deadline' || query.sort === 'status' || query.sort === 'recent' ? query.sort : 'deadline'
+  const selectedClassId =
+    query.classId !== 'all' && studentClassesMock.some((item) => item.id === query.classId)
+      ? query.classId
+      : studentClassesMock[0]?.id
+
   const frame: StudentPageFrame = {
     shell,
     pageTitle: 'Bài tập',
-    pageDescription: 'Theo dõi trạng thái nộp bài, tình trạng chấm và điểm số theo từng học phần.',
+    pageDescription: 'Chọn lớp trước, sau đó tập trung vào đúng nhóm bài cần xử lý để không bị loãng thông tin.',
     breadcrumbs: [
       { label: 'Trang chủ', href: buildStudentPortalHref('dashboard') },
       { label: 'Bài tập' },
     ],
   }
 
-  const filters: AssignmentFilterChip[] = assignmentFilters.map((filterKey) => ({
+  const classAssignments = studentAssignmentsMock.filter((assignment) => assignment.classId === selectedClassId)
+  const selectedClass = studentClassesMock.find((item) => item.id === selectedClassId)
+
+  const classes = studentClassesMock.map((studentClass) => {
+    const rows = studentAssignmentsMock.filter((assignment) => assignment.classId === studentClass.id)
+    const nextDeadline = rows
+      .slice()
+      .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())
+      .find((assignment) => assignment.status !== 'closed')
+
+    return {
+      id: studentClass.id,
+      code: studentClass.code,
+      name: studentClass.name,
+      lecturerName: studentClass.lecturerName,
+      helperText: nextDeadline ? `Hạn gần nhất ${formatPortalDateTime(nextDeadline.dueAt)}` : 'Chưa có hạn nộp mới',
+      openAssignmentsLabel: `${rows.filter((assignment) => assignment.status === 'published').length} bài đang mở`,
+      progressLabel: `${rows.filter((assignment) => assignment.gradingStatus === 'published').length}/${rows.length} bài đã có điểm`,
+      href: buildStudentPortalHref('assignments', {
+        classId: studentClass.id,
+        filter: activeFilter,
+        q: query.search || undefined,
+        sort: safeSort,
+      }),
+      isActive: studentClass.id === selectedClassId,
+    }
+  })
+
+  const filters = assignmentFilters.map((filterKey) => ({
     key: filterKey,
-    label: getAssignmentFilterLabel(filterKey),
-    href: buildFilterHref(filterKey),
+    label: filterKey === 'not_submitted' ? 'Chưa nộp' : filterKey === 'submitted' ? 'Đã nộp' : 'Quá hạn',
+    href: buildStudentPortalHref('assignments', {
+      filter: filterKey,
+      classId: selectedClassId,
+      q: query.search || undefined,
+      sort: safeSort,
+    }),
     isActive: filterKey === activeFilter,
+    count: classAssignments.filter((assignment) => matchesFilter(filterKey, assignment)).length,
   }))
 
+  const onSearchChange = (value: string) => setQuery({ search: value })
+  const onSortChange = (value: AssignmentSort) => setQuery({ sort: value })
+
   if (state === 'loading') {
-    return { state, frame, filters, rows: [] }
+    return {
+      state,
+      frame,
+      classes,
+      selectedClass: selectedClass
+        ? {
+            id: selectedClass.id,
+            title: getClassLabel(selectedClass),
+            lecturerName: selectedClass.lecturerName,
+            overview: selectedClass.overview,
+          }
+        : undefined,
+      filters,
+      rows: [],
+      searchValue: query.search,
+      sortValue: safeSort,
+      onSearchChange,
+      onSortChange,
+    }
   }
 
   if (state === 'error') {
     return {
       state,
       frame,
+      classes,
+      selectedClass: selectedClass
+        ? {
+            id: selectedClass.id,
+            title: getClassLabel(selectedClass),
+            lecturerName: selectedClass.lecturerName,
+            overview: selectedClass.overview,
+          }
+        : undefined,
       filters,
       rows: [],
-      errorMessage: 'Không thể tải danh sách bài tập. Vui lòng thử lại sau.',
+      searchValue: query.search,
+      sortValue: safeSort,
+      onSearchChange,
+      onSortChange,
+      errorMessage: 'Không thể tải khu vực bài tập vào lúc này.',
     }
   }
 
-  const filteredRows = studentAssignmentsMock
+  const rows = sortAssignments(safeSort, classAssignments)
     .filter((assignment) => matchesFilter(activeFilter, assignment))
-    .map((assignment) => {
-      const studentClass = studentClassesMock.find((item) => item.id === assignment.classId)
-      const submissionMeta = getSubmissionStatusMeta(assignment.submissionStatus)
-      const gradingMeta = getGradingStatusMeta(assignment.gradingStatus)
+    .filter((assignment) => {
+      if (!query.search) {
+        return true
+      }
 
+      const keyword = query.search.toLowerCase()
+      return (
+        assignment.title.toLowerCase().includes(keyword) ||
+        assignment.description.toLowerCase().includes(keyword) ||
+        assignment.id.toLowerCase().includes(keyword)
+      )
+    })
+    .map((assignment) => {
+      const meta = getAssignmentDisplayMeta(assignment)
       return {
         id: assignment.id,
         title: assignment.title,
-        classLabel: studentClass ? getClassLabel(studentClass) : assignment.classId,
-        deadlineLabel: formatPortalDateTime(assignment.deadline),
-        submissionLabel: submissionMeta.label,
-        submissionTone: submissionMeta.tone,
-        gradingLabel: gradingMeta.label,
-        gradingTone: gradingMeta.tone,
-        scoreLabel: assignment.score ? assignment.score.toFixed(1) : '--',
-        href: buildStudentPortalHref('assignment-detail', { assignmentId: assignment.id }),
+        classLabel: selectedClass ? getClassLabel(selectedClass) : assignment.classId,
+        summary: assignment.description,
+        deadlineLabel: formatPortalDateTime(assignment.dueAt),
+        deadlineTone: getDeadlineTone(assignment.dueAt),
+        statusLabel: meta.statusLabel,
+        statusTone: meta.statusTone,
+        scoreLabel: assignment.score !== undefined ? `${assignment.score.toFixed(1)}/${assignment.maxScore}` : undefined,
+        primaryActionLabel: meta.primaryActionLabel,
+        primaryActionHref: meta.primaryActionHref,
+        secondaryActionHref: buildStudentPortalHref('assignment-detail', { assignmentId: assignment.id }),
+        secondaryActionLabel: 'Xem chi tiết',
       }
     })
 
-  if (state === 'empty') {
-    return { state, frame, filters, rows: [] }
+  if (state === 'empty' || !selectedClass || !rows.length) {
+    return {
+      state: 'empty',
+      frame,
+      classes,
+      selectedClass: selectedClass
+        ? {
+            id: selectedClass.id,
+            title: getClassLabel(selectedClass),
+            lecturerName: selectedClass.lecturerName,
+            overview: selectedClass.overview,
+          }
+        : undefined,
+      filters,
+      rows: [],
+      searchValue: query.search,
+      sortValue: safeSort,
+      onSearchChange,
+      onSortChange,
+    }
   }
 
   return {
     state,
     frame,
+    classes,
+    selectedClass: {
+      id: selectedClass.id,
+      title: getClassLabel(selectedClass),
+      lecturerName: selectedClass.lecturerName,
+      overview: selectedClass.overview,
+    },
     filters,
-    rows: filteredRows,
+    rows,
+    searchValue: query.search,
+    sortValue: safeSort,
+    onSearchChange,
+    onSortChange,
   }
 }
 
@@ -149,11 +395,13 @@ export function useStudentAssignmentDetailController(
   const shell = useStudentPortalShellController('assignment-detail')
   const assignment = studentAssignmentsMock.find((item) => item.id === assignmentId)
   const studentClass = assignment ? studentClassesMock.find((item) => item.id === assignment.classId) : undefined
+  const result = assignment ? studentResultsMock.find((item) => item.assignmentId === assignment.id) : undefined
+  const feedbackThread = assignment ? feedbackThreadsMock.find((item) => item.assignmentId === assignment.id) : undefined
 
   const baseFrame: StudentPageFrame = {
     shell,
     pageTitle: assignment?.title ?? 'Chi tiết bài tập',
-    pageDescription: 'Hoàn thành lần lượt từng câu hỏi, lưu nháp khi cần và nộp bài chính thức khi đã đủ minh chứng.',
+    pageDescription: 'Xem yêu cầu, nộp bài và theo dõi phản hồi trong cùng một luồng xử lý.',
     breadcrumbs: [
       { label: 'Trang chủ', href: buildStudentPortalHref('dashboard') },
       { label: 'Bài tập', href: buildStudentPortalHref('assignments') },
@@ -166,6 +414,14 @@ export function useStudentAssignmentDetailController(
       state: 'error',
       frame: baseFrame,
       errorMessage: 'Không tìm thấy bài tập cần mở.',
+    }
+  }
+
+  if (assignmentId && !canStudentViewAssignment(studentProfileMock.id, assignmentId)) {
+    return {
+      state: 'error',
+      frame: baseFrame,
+      errorMessage: 'Bạn không có quyền xem bài tập này.',
     }
   }
 
@@ -184,36 +440,17 @@ export function useStudentAssignmentDetailController(
     }
   }
 
-  if (state === 'empty') {
-    return {
-      state,
-      frame: baseFrame,
-      assignment: {
-        id: assignment.id,
-        title: assignment.title,
-        classLabel: getClassLabel(studentClass),
-        deadlineLabel: formatPortalDateTime(assignment.deadline),
-        submissionLabel: submissionMeta.label,
-        submissionTone: submissionMeta.tone,
-        gradingLabel: gradingMeta.label,
-        gradingTone: gradingMeta.tone,
-        instructions: assignment.instructions,
-        questions: [],
-        requirements: assignment.requirements,
-        allowedSubmissionFormats: assignment.allowedSubmissionFormats,
-        completionLabel: '0 câu đã hoàn thành',
-      },
-    }
-  }
-
   return {
-    state,
+    state: state === 'empty' ? 'ready' : state,
     frame: baseFrame,
     assignment: {
       id: assignment.id,
       title: assignment.title,
       classLabel: getClassLabel(studentClass),
-      deadlineLabel: formatPortalDateTime(assignment.deadline),
+      deadlineLabel: formatPortalDateTime(assignment.dueAt),
+      dueAt: assignment.dueAt,
+      allowLateSubmission: assignment.allowLateSubmission,
+      assignmentStatus: assignment.status,
       submissionLabel: submissionMeta.label,
       submissionTone: submissionMeta.tone,
       gradingLabel: gradingMeta.label,
@@ -225,6 +462,18 @@ export function useStudentAssignmentDetailController(
       completionLabel: getCompletionLabel(assignment),
       draftSavedAtLabel: assignment.draftSavedAt ? formatPortalDateTime(assignment.draftSavedAt) : undefined,
       submittedAtLabel: assignment.submittedAt ? formatPortalDateTime(assignment.submittedAt) : undefined,
+      description: assignment.description,
+      resourceLinks: assignment.resourceLinks,
+      feedbackMessages: feedbackThread?.messages ?? [],
+      resultSummary: result
+        ? {
+            totalScore: result.totalScore,
+            maxScore: result.maxScore,
+            lecturerFeedback: result.lecturerFeedback,
+            updatedAtLabel: formatPortalDateTime(result.updatedAt),
+            resultHref: buildStudentPortalHref('result-detail', { resultId: result.id }),
+          }
+        : undefined,
     },
   }
 }

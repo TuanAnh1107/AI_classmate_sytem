@@ -8,11 +8,7 @@ type UpcomingAssignmentsPanelProps = {
 
 export function UpcomingAssignmentsPanel({ items }: UpcomingAssignmentsPanelProps) {
   return (
-    <PageSection
-      title="Bài tập gần hạn"
-      kicker="Cần ưu tiên"
-      description="Những bài còn mở trong vài ngày tới, cần kiểm tra tiến độ trước khi nộp."
-    >
+    <PageSection title="Bài tập gần hạn" kicker="Cần ưu tiên" description="Các bài còn mở trong vài ngày tới, nên xử lý trước để tránh dồn việc vào sát hạn nộp.">
       {items.length ? (
         <div className="portal-list-block">
           {items.map((item) => (
@@ -29,7 +25,7 @@ export function UpcomingAssignmentsPanel({ items }: UpcomingAssignmentsPanelProp
           ))}
         </div>
       ) : (
-        <EmptyState title="Chưa có bài gần hạn" description="Hiện chưa có bài tập nào cần xử lý gấp trong thời gian tới." />
+        <EmptyState title="Chưa có bài gần hạn" description="Hiện chưa có bài tập nào cần xử lý gấp trong các ngày tới." />
       )}
     </PageSection>
   )

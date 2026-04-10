@@ -1,4 +1,6 @@
-import type { StudentClassRow } from '../../../models/student/student.types'
+﻿import type { StudentClassRow } from '../../../models/student/student.types'
+import { DisclosureSection } from '../shared/DisclosureSection'
+import { ProgressBar } from '../shared/ProgressBar'
 
 type ClassesTableProps = {
   rows: StudentClassRow[]
@@ -6,33 +8,44 @@ type ClassesTableProps = {
 
 export function ClassesTable({ rows }: ClassesTableProps) {
   return (
-    <div className="portal-table-shell">
-      <table className="portal-table">
-        <thead>
-          <tr>
-            <th>Lớp học</th>
-            <th>Giảng viên</th>
-            <th>Mã lớp</th>
-            <th>Bài tập đang mở</th>
-            <th>Tiến độ</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.id}>
-              <td>
-                <a href={row.href} className="portal-table-title-link">
-                  {row.title}
-                </a>
-              </td>
-              <td>{row.lecturerName}</td>
-              <td>{row.classCode}</td>
-              <td>{row.openAssignmentsLabel}</td>
-              <td>{row.progressLabel}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="assignment-worklist">
+      {rows.map((row) => (
+        <article key={row.id} className="assignment-work-item assignment-work-item-compact">
+          <div className="assignment-work-copy">
+            <div className="assignment-work-head">
+              <div>
+                <p className="assignment-work-class">{row.classCode}</p>
+                <h3>{row.title}</h3>
+              </div>
+            </div>
+
+            <div className="assignment-work-meta">
+              <span>{row.openAssignmentsLabel}</span>
+            </div>
+          </div>
+
+          <div className="assignment-work-actions">
+            <a className="portal-primary-button" href={row.href}>
+              Vào lớp học
+            </a>
+          </div>
+
+          <DisclosureSection
+            title="Xem nhanh thông tin lớp"
+            kicker="Chi tiết phụ"
+            description="Mở khi cần xem giảng viên và tiến độ tổng quan của lớp."
+            className="assignment-inline-disclosure"
+          >
+            <div className="portal-form-stack">
+              <div className="assignment-work-meta assignment-work-meta-block">
+                <span>Giảng viên: {row.lecturerName}</span>
+                <span>{row.progressLabel}</span>
+              </div>
+              <ProgressBar value={row.progressPercent} label={row.progressLabel} />
+            </div>
+          </DisclosureSection>
+        </article>
+      ))}
     </div>
   )
 }

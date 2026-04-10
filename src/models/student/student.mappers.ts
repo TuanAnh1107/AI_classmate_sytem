@@ -1,4 +1,4 @@
-import type { StudentPageKey } from '../app.types'
+﻿import type { StudentPageKey } from '../app.types'
 import type { LinkItemModel, PortalNavItem, SecondaryTabModel, StatusTone } from '../shared/portal.types'
 import type {
   AssignmentFilter,
@@ -50,8 +50,8 @@ export function buildStudentPortalHref(page: StudentPageKey, params?: Record<str
   return `?${searchParams.toString()}`
 }
 
-export function buildFilterHref(filter: AssignmentFilter) {
-  return buildStudentPortalHref('assignments', { filter })
+export function buildFilterHref(filter: AssignmentFilter, params?: Record<string, string | undefined>) {
+  return buildStudentPortalHref('assignments', { filter, ...params })
 }
 
 export function buildClassTabItems(classId: string, activeTab: ClassDetailTab): SecondaryTabModel[] {
@@ -69,38 +69,39 @@ export function buildClassTabItems(classId: string, activeTab: ClassDetailTab): 
   }))
 }
 
-export function buildStudentNavItems(activePage: StudentPageKey): PortalNavItem[] {
-  const pageToNav: Record<
-    StudentPageKey,
-    'dashboard' | 'classes' | 'assignments' | 'results' | 'feedback' | 'guide'
-  > = {
-    dashboard: 'dashboard',
-    classes: 'classes',
-    'class-detail': 'classes',
+export function buildStudentNavItems(activePage: StudentPageKey, unreadCount = 0): PortalNavItem[] {
+  const pageToNav: Record<StudentPageKey, 'home' | 'assignments' | 'notifications'> = {
+    dashboard: 'home',
+    profile: 'home',
+    notifications: 'notifications',
+    classes: 'assignments',
+    'class-detail': 'assignments',
     assignments: 'assignments',
     'assignment-detail': 'assignments',
-    results: 'results',
-    'result-detail': 'results',
-    feedback: 'feedback',
-    profile: 'dashboard',
+    'assignment-submit': 'assignments',
+    results: 'assignments',
+    'result-detail': 'assignments',
+    feedback: 'assignments',
   }
 
   const activeNav = pageToNav[activePage]
 
   return [
-    { label: 'Trang chủ', href: buildStudentPortalHref('dashboard'), isActive: activeNav === 'dashboard' },
-    { label: 'Lớp học của tôi', href: buildStudentPortalHref('classes'), isActive: activeNav === 'classes' },
+    { label: 'Trang chủ', href: buildStudentPortalHref('dashboard'), isActive: activeNav === 'home' },
     { label: 'Bài tập', href: buildStudentPortalHref('assignments'), isActive: activeNav === 'assignments' },
-    { label: 'Kết quả', href: buildStudentPortalHref('results'), isActive: activeNav === 'results' },
-    { label: 'Phản hồi', href: buildStudentPortalHref('feedback'), isActive: activeNav === 'feedback' },
-    { label: 'Hướng dẫn', href: buildStudentPortalHref('dashboard') + '#huong-dan', isActive: activeNav === 'guide' },
+    {
+      label: 'Thông báo',
+      href: buildStudentPortalHref('notifications'),
+      isActive: activeNav === 'notifications',
+      badgeCount: unreadCount,
+    },
   ]
 }
 
 export function buildUserMenuLinks(): LinkItemModel[] {
   return [
     { label: 'Thông tin cá nhân', href: buildStudentPortalHref('profile') },
-    { label: 'Đổi mật khẩu', href: buildStudentPortalHref('dashboard') + '#doi-mat-khau' },
+    { label: 'Đổi mật khẩu', href: `${buildStudentPortalHref('dashboard')}#doi-mat-khau` },
     { label: 'Đăng xuất', href: '?' },
   ]
 }
@@ -112,7 +113,7 @@ export function getSubmissionStatusMeta(status: SubmissionStatus): { label: stri
     case 'submitted':
       return { label: 'Đã nộp', tone: 'success' }
     case 'late':
-      return { label: 'Quá hạn', tone: 'danger' }
+      return { label: 'Nộp trễ', tone: 'warning' }
     case 'not_submitted':
     default:
       return { label: 'Chưa nộp', tone: 'warning' }
@@ -122,7 +123,7 @@ export function getSubmissionStatusMeta(status: SubmissionStatus): { label: stri
 export function getGradingStatusMeta(status: GradingStatus): { label: string; tone: StatusTone } {
   switch (status) {
     case 'pending':
-      return { label: 'Đang chờ chấm', tone: 'info' }
+      return { label: 'Chưa có điểm', tone: 'info' }
     case 'published':
       return { label: 'Đã có kết quả', tone: 'success' }
     case 'not_started':
@@ -171,10 +172,8 @@ export function getAssignmentFilterLabel(filter: AssignmentFilter) {
       return 'Chưa nộp'
     case 'submitted':
       return 'Đã nộp'
-    case 'late':
+    case 'overdue':
       return 'Quá hạn'
-    case 'graded':
-      return 'Đã có kết quả'
     case 'all':
     default:
       return 'Tất cả'

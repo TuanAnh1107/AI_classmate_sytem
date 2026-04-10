@@ -1,6 +1,6 @@
 import type { DataState } from '../../models/shared/portal.types'
-import type { ResultRow, StudentPageFrame } from '../../models/student/student.types'
-import { studentAssignmentsMock, studentClassesMock, studentResultsMock } from '../../models/student/student.mock'
+import type { FeedbackFilter, ResultRow, ResultSort, StudentPageFrame } from '../../models/student/student.types'
+import { studentAssignmentsMock, studentClassesMock, studentProfileMock, studentResultsMock } from '../../models/student/student.mock'
 import {
   buildStudentPortalHref,
   formatPortalDate,
@@ -8,12 +8,20 @@ import {
   getClassLabel,
   getFeedbackStatusMeta,
 } from '../../models/student/student.mappers'
+import { canStudentViewAssignment } from '../../services/domain/accessControl'
 import { useStudentPortalShellController } from './useStudentPortalShellController'
+import { useStudentQueryParams } from './useStudentQueryParams'
 
 export interface StudentResultsViewModel {
   state: DataState
   frame: StudentPageFrame
   rows: ResultRow[]
+  searchValue: string
+  feedbackFilter: FeedbackFilter
+  sortValue: ResultSort
+  onSearchChange: (value: string) => void
+  onFeedbackChange: (value: FeedbackFilter) => void
+  onSortChange: (value: ResultSort) => void
   errorMessage?: string
 }
 
@@ -32,20 +40,56 @@ export interface StudentResultDetailViewModel {
   errorMessage?: string
 }
 
+function sortResults(sort: ResultSort, rows: ResultRow[]) {
+  const sorted = [...rows]
+
+  switch (sort) {
+    case 'score':
+      sorted.sort((a, b) => parseFloat(b.scoreLabel) - parseFloat(a.scoreLabel))
+      break
+    case 'updated':
+    default:
+      return sorted
+  }
+
+  return sorted
+}
+
 export function useStudentResultsController(state: DataState): StudentResultsViewModel {
   const shell = useStudentPortalShellController('results')
+  const { query, setQuery } = useStudentQueryParams()
+  const safeSort: ResultSort = query.sort === 'score' || query.sort === 'updated' ? query.sort : 'updated'
+  const safeFeedback: FeedbackFilter =
+    query.feedback === 'new' || query.feedback === 'reply_required' || query.feedback === 'read' || query.feedback === 'all'
+      ? query.feedback
+      : 'all'
+
   const frame: StudentPageFrame = {
     shell,
     pageTitle: 'Kết quả',
-    pageDescription: 'Tổng hợp các bài đã có điểm, thời điểm cập nhật và trạng thái phản hồi từ giảng viên.',
+    pageDescription: 'Tập trung vào các bài đã có điểm, cập nhật mới và phản hồi cần xem lại để không bỏ sót thay đổi quan trọng.',
     breadcrumbs: [
       { label: 'Trang chủ', href: buildStudentPortalHref('dashboard') },
       { label: 'Kết quả' },
     ],
   }
 
+  const setSearch = (value: string) => setQuery({ search: value })
+  const setFeedback = (value: FeedbackFilter) => setQuery({ feedback: value })
+  const setSort = (value: ResultSort) => setQuery({ sort: value })
+
   if (state === 'loading') {
-    return { state, frame, rows: [] }
+    return {
+      state,
+      frame,
+      rows: [],
+      searchValue: query.search,
+      feedbackFilter: safeFeedback,
+      sortValue: safeSort,
+      onSearchChange: setSearch,
+      onFeedbackChange: setFeedback,
+      onSortChange: setSort,
+    }
   }
 
   if (state === 'error') {
@@ -53,32 +97,71 @@ export function useStudentResultsController(state: DataState): StudentResultsVie
       state,
       frame,
       rows: [],
+      searchValue: query.search,
+      feedbackFilter: safeFeedback,
+      sortValue: safeSort,
+      onSearchChange: setSearch,
+      onFeedbackChange: setFeedback,
+      onSortChange: setSort,
       errorMessage: 'Không thể tải danh sách kết quả. Vui lòng thử lại sau.',
     }
   }
 
-  if (state === 'empty') {
-    return { state, frame, rows: [] }
+  const rows: ResultRow[] = studentResultsMock
+    .filter((result) => canStudentViewAssignment(studentProfileMock.id, result.assignmentId))
+    .filter((result) => (safeFeedback === 'all' ? true : result.feedbackStatus === safeFeedback))
+    .map((result) => {
+      const assignment = studentAssignmentsMock.find((item) => item.id === result.assignmentId)
+      const studentClass = studentClassesMock.find((item) => item.id === result.classId)
+      const feedbackMeta = getFeedbackStatusMeta(result.feedbackStatus)
+
+      return {
+        id: result.id,
+        title: assignment?.title ?? 'Bài tập',
+        classLabel: studentClass ? getClassLabel(studentClass) : result.classId,
+        scoreLabel: `${result.totalScore.toFixed(1)}/${result.maxScore}`,
+        updatedAtLabel: formatPortalDate(result.updatedAt),
+        feedbackLabel: feedbackMeta.label,
+        feedbackTone: feedbackMeta.tone,
+        href: buildStudentPortalHref('result-detail', { resultId: result.id }),
+      }
+    })
+    .filter((row) => {
+      if (!query.search) {
+        return true
+      }
+
+      const keyword = query.search.toLowerCase()
+      return row.title.toLowerCase().includes(keyword) || row.classLabel.toLowerCase().includes(keyword)
+    })
+
+  const sortedRows = sortResults(safeSort, rows)
+
+  if (state === 'empty' || !sortedRows.length) {
+    return {
+      state: 'empty',
+      frame,
+      rows: [],
+      searchValue: query.search,
+      feedbackFilter: safeFeedback,
+      sortValue: safeSort,
+      onSearchChange: setSearch,
+      onFeedbackChange: setFeedback,
+      onSortChange: setSort,
+    }
   }
 
-  const rows: ResultRow[] = studentResultsMock.map((result) => {
-    const assignment = studentAssignmentsMock.find((item) => item.id === result.assignmentId)
-    const studentClass = studentClassesMock.find((item) => item.id === result.classId)
-    const feedbackMeta = getFeedbackStatusMeta(result.feedbackStatus)
-
-    return {
-      id: result.id,
-      title: assignment?.title ?? 'Bài tập',
-      classLabel: studentClass ? getClassLabel(studentClass) : result.classId,
-      scoreLabel: `${result.totalScore.toFixed(1)}/${result.maxScore}`,
-      updatedAtLabel: formatPortalDate(result.updatedAt),
-      feedbackLabel: feedbackMeta.label,
-      feedbackTone: feedbackMeta.tone,
-      href: buildStudentPortalHref('result-detail', { resultId: result.id }),
-    }
-  })
-
-  return { state, frame, rows }
+  return {
+    state,
+    frame,
+    rows: sortedRows,
+    searchValue: query.search,
+    feedbackFilter: safeFeedback,
+    sortValue: safeSort,
+    onSearchChange: setSearch,
+    onFeedbackChange: setFeedback,
+    onSortChange: setSort,
+  }
 }
 
 export function useStudentResultDetailController(
@@ -93,7 +176,7 @@ export function useStudentResultDetailController(
   const frame: StudentPageFrame = {
     shell,
     pageTitle: assignment?.title ?? 'Chi tiết kết quả',
-    pageDescription: 'Xem điểm tổng, điểm từng câu và nhận xét chi tiết dựa trên rubric đã công bố.',
+    pageDescription: 'Xem điểm tổng, điểm từng câu và phản hồi theo rubric để biết mình cần cải thiện chính xác ở đâu.',
     breadcrumbs: [
       { label: 'Trang chủ', href: buildStudentPortalHref('dashboard') },
       { label: 'Kết quả', href: buildStudentPortalHref('results') },
@@ -106,6 +189,14 @@ export function useStudentResultDetailController(
       state: 'error',
       frame,
       errorMessage: 'Không tìm thấy kết quả cần xem.',
+    }
+  }
+
+  if (!canStudentViewAssignment(studentProfileMock.id, result.assignmentId)) {
+    return {
+      state: 'error',
+      frame,
+      errorMessage: 'Bạn không có quyền xem kết quả này.',
     }
   }
 

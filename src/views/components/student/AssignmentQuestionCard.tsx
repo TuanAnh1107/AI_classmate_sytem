@@ -1,9 +1,12 @@
-import type { AssignmentQuestion } from '../../../models/student/student.types'
+﻿import type { StudentAssignmentQuestion } from '../../../models/student/student.types'
 import { getCompletionStatusMeta } from '../../../models/student/student.mappers'
+import { AttachmentList } from '../shared/AttachmentList'
+import { DisclosureSection } from '../shared/DisclosureSection'
 import { StatusBadge } from '../shared/StatusBadge'
+import { TextArea } from '../shared/TextArea'
 
 type AssignmentQuestionCardProps = {
-  question: AssignmentQuestion
+  question: StudentAssignmentQuestion
 }
 
 export function AssignmentQuestionCard({ question }: AssignmentQuestionCardProps) {
@@ -16,46 +19,46 @@ export function AssignmentQuestionCard({ question }: AssignmentQuestionCardProps
           <p className="assignment-question-label">Câu {question.order}</p>
           <h3>{question.prompt}</h3>
         </div>
-        <StatusBadge label={completionMeta.label} tone={completionMeta.tone} />
+        <div className="assignment-question-meta">
+          <StatusBadge label={completionMeta.label} tone={completionMeta.tone} />
+          <span>{question.rubric.length} tiêu chí</span>
+        </div>
       </header>
 
-      {question.attachmentName ? (
-        <p className="assignment-question-attachment">Tệp đính kèm: {question.attachmentName}</p>
-      ) : null}
+      <div className="assignment-work-meta assignment-work-meta-block">
+        {question.attachmentName ? <span>Tệp đính kèm: {question.attachmentName}</span> : <span>Không có tệp từ giảng viên</span>}
+        <span>{question.uploadedFiles.length} tệp bài làm</span>
+      </div>
 
-      <section className="assignment-question-rubric">
-        <h4>Tiêu chí chấm tóm tắt</h4>
-        <ul>
-          {question.rubric.map((item) => (
-            <li key={item.id}>
-              <strong>{item.label}</strong>
-              <span>{item.detail}</span>
-              <em>{item.maxScore} điểm</em>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="assignment-answer-block">
-        <h4>Câu trả lời văn bản</h4>
-        <textarea readOnly value={question.answerText} placeholder="Chưa có nội dung trả lời." />
-      </section>
-
-      <section className="assignment-upload-block">
-        <h4>Tệp đã đính kèm</h4>
-        {question.uploadedFiles.length ? (
+      <DisclosureSection
+        title="Rubric, bài làm và tệp đính kèm"
+        kicker="Chi tiết câu hỏi"
+        description="Mở khi cần xem đầy đủ tiêu chí chấm, nội dung trả lời và tệp đã nộp của câu này."
+        className="assignment-inline-disclosure"
+      >
+        <section className="assignment-question-rubric">
+          <h4>Tiêu chí chấm tóm tắt</h4>
           <ul>
-            {question.uploadedFiles.map((file) => (
-              <li key={file.id}>
-                <span>{file.fileName}</span>
-                <em>{file.sizeLabel}</em>
+            {question.rubric.map((item) => (
+              <li key={item.id}>
+                <strong>{item.label}</strong>
+                <span>{item.detail}</span>
+                <em>{item.maxScore} điểm</em>
               </li>
             ))}
           </ul>
-        ) : (
-          <p>Chưa có tệp nào được tải lên cho câu này.</p>
-        )}
-      </section>
+        </section>
+
+        <section className="assignment-answer-block">
+          <h4>Câu trả lời văn bản</h4>
+          <TextArea readOnly value={question.answerText} placeholder="Chưa có nội dung trả lời." />
+        </section>
+
+        <section className="assignment-upload-block">
+          <h4>Tệp đã đính kèm</h4>
+          <AttachmentList items={question.uploadedFiles.map((file) => `${file.fileName} · ${file.sizeLabel}`)} />
+        </section>
+      </DisclosureSection>
     </article>
   )
 }

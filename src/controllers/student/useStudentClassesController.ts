@@ -1,6 +1,12 @@
 import type { DataState, StatusTone } from '../../models/shared/portal.types'
 import type { StudentPageFrame, StudentClassRow, ClassDetailTab } from '../../models/student/student.types'
-import { classAnnouncementsMock, studentAssignmentsMock, studentClassesMock, studentResultsMock } from '../../models/student/student.mock'
+import {
+  classAnnouncementsMock,
+  studentAssignmentsMock,
+  studentClassesMock,
+  studentProfileMock,
+  studentResultsMock,
+} from '../../models/student/student.mock'
 import {
   buildClassTabItems,
   buildStudentPortalHref,
@@ -9,12 +15,16 @@ import {
   getGradingStatusMeta,
   getSubmissionStatusMeta,
 } from '../../models/student/student.mappers'
+import { canStudentViewClass } from '../../services/domain/accessControl'
 import { useStudentPortalShellController } from './useStudentPortalShellController'
+import { useStudentQueryParams } from './useStudentQueryParams'
 
 export interface StudentClassesListViewModel {
   state: DataState
   frame: StudentPageFrame
   rows: StudentClassRow[]
+  searchValue: string
+  onSearchChange: (value: string) => void
   errorMessage?: string
 }
 
@@ -70,18 +80,21 @@ export interface StudentClassDetailViewModel {
 
 export function useStudentClassesController(state: DataState): StudentClassesListViewModel {
   const shell = useStudentPortalShellController('classes')
+  const { query, setQuery } = useStudentQueryParams()
   const frame: StudentPageFrame = {
     shell,
     pageTitle: 'Lớp học của tôi',
-    pageDescription: 'Danh sách học phần đang tham gia cùng tiến độ hoàn thành bài tập theo từng lớp.',
+    pageDescription: 'Theo dõi từng lớp đang tham gia, số bài đang mở và mức độ hoàn thành theo nhịp học thực tế.',
     breadcrumbs: [
       { label: 'Trang chủ', href: buildStudentPortalHref('dashboard') },
       { label: 'Lớp học của tôi' },
     ],
   }
 
+  const onSearchChange = (value: string) => setQuery({ search: value })
+
   if (state === 'loading') {
-    return { state, frame, rows: [] }
+    return { state, frame, rows: [], searchValue: query.search, onSearchChange }
   }
 
   if (state === 'error') {
@@ -89,26 +102,55 @@ export function useStudentClassesController(state: DataState): StudentClassesLis
       state,
       frame,
       rows: [],
+      searchValue: query.search,
+      onSearchChange,
       errorMessage: 'Không thể tải danh sách lớp học. Vui lòng thử lại sau.',
     }
   }
 
   if (state === 'empty') {
-    return { state, frame, rows: [] }
+    return { state, frame, rows: [], searchValue: query.search, onSearchChange }
   }
 
-  return {
-    state,
-    frame,
-    rows: studentClassesMock.map((studentClass) => ({
+  const rows = studentClassesMock
+    .filter((studentClass) => {
+      if (!query.search) {
+        return true
+      }
+      const keyword = query.search.toLowerCase()
+      return (
+        studentClass.name.toLowerCase().includes(keyword) ||
+        studentClass.code.toLowerCase().includes(keyword) ||
+        studentClass.lecturerName.toLowerCase().includes(keyword)
+      )
+    })
+    .map((studentClass) => ({
       id: studentClass.id,
       title: studentClass.name,
       lecturerName: studentClass.lecturerName,
       classCode: studentClass.code,
       openAssignmentsLabel: `${studentClass.openAssignments} bài đang mở`,
       progressLabel: `${studentClass.completionPercent}% hoàn thành`,
+      progressPercent: studentClass.completionPercent,
       href: buildStudentPortalHref('class-detail', { classId: studentClass.id, tab: 'overview' }),
-    })),
+    }))
+
+  if (!rows.length) {
+    return {
+      state: 'empty',
+      frame,
+      rows: [],
+      searchValue: query.search,
+      onSearchChange,
+    }
+  }
+
+  return {
+    state,
+    frame,
+    rows,
+    searchValue: query.search,
+    onSearchChange,
   }
 }
 
@@ -123,7 +165,7 @@ export function useStudentClassDetailController(
   const baseFrame: StudentPageFrame = {
     shell,
     pageTitle: studentClass?.name ?? 'Chi tiết lớp học',
-    pageDescription: 'Theo dõi tiến độ học phần, danh sách bài tập, kết quả và thông báo từ giảng viên.',
+    pageDescription: 'Theo dõi tiến độ học phần, bài tập, kết quả và thông báo của lớp trong cùng một không gian.',
     breadcrumbs: [
       { label: 'Trang chủ', href: buildStudentPortalHref('dashboard') },
       { label: 'Lớp học của tôi', href: buildStudentPortalHref('classes') },
@@ -144,6 +186,18 @@ export function useStudentClassDetailController(
     }
   }
 
+  if (classId && !canStudentViewClass(studentProfileMock.id, classId)) {
+    return {
+      state: 'error',
+      frame: baseFrame,
+      assignments: [],
+      results: [],
+      announcements: [],
+      activeTab,
+      errorMessage: 'Bạn không có quyền xem lớp học này.',
+    }
+  }
+
   if (state === 'loading') {
     return { state, frame: baseFrame, classSummary: undefined, assignments: [], results: [], announcements: [], activeTab }
   }
@@ -159,7 +213,7 @@ export function useStudentClassDetailController(
     return {
       id: assignment.id,
       title: assignment.title,
-      deadlineLabel: formatPortalDate(assignment.deadline),
+      deadlineLabel: formatPortalDate(assignment.dueAt),
       submissionLabel: submissionMeta.label,
       submissionTone: submissionMeta.tone,
       gradingLabel: gradingMeta.label,

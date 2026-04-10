@@ -1,4 +1,5 @@
-﻿import type { StudentDashboardMetric } from '../../../models/student/student.types'
+import type { StudentDashboardMetric } from '../../../models/student/student.types'
+import { CountUp } from '../shared/CountUp'
 
 type DashboardSummaryCardsProps = {
   metrics: StudentDashboardMetric[]
@@ -10,10 +11,11 @@ export function DashboardSummaryCards({ metrics }: DashboardSummaryCardsProps) {
       {metrics.map((metric) => (
         <article key={metric.id} className={`dashboard-metric-card tone-${metric.tone}`}>
           <p>{metric.label}</p>
-          <strong>{metric.value}</strong>
+          <strong>
+            {Number.isFinite(Number(metric.value)) ? <CountUp value={Number(metric.value)} /> : metric.value}
+          </strong>
         </article>
       ))}
     </div>
   )
 }
-

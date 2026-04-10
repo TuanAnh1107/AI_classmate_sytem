@@ -8,7 +8,7 @@ type RecentResultsPanelProps = {
 
 export function RecentResultsPanel({ items }: RecentResultsPanelProps) {
   return (
-    <PageSection title="Kết quả mới" kicker="Cập nhật gần đây" description="Điểm và phản hồi vừa được công bố trong tuần học này.">
+    <PageSection title="Kết quả mới" kicker="Cập nhật gần đây" description="Điểm và phản hồi vừa được công bố, nên xem ngay để kịp điều chỉnh cho các bài tiếp theo.">
       {items.length ? (
         <div className="portal-list-block compact">
           {items.map((item) => (

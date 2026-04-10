@@ -26,7 +26,7 @@ export const homePageData: HomePageViewModel = {
     description:
       'Hỗ trợ giảng viên giao bài, đánh giá theo tiêu chí và phản hồi học tập trên một nền tảng thống nhất cho toàn lớp.',
     actions: [
-      { label: 'Đăng nhập giảng viên', href: '/login?role=lecturer', variant: 'primary' },
+      { label: 'Đăng nhập giảng viên', href: '?portal=lecturer&page=assignments', variant: 'primary' },
       { label: 'Đăng nhập sinh viên', href: '?portal=student&page=dashboard', variant: 'secondary' },
     ],
     guideLink: {

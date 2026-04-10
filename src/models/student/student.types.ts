@@ -1,20 +1,16 @@
-﻿import type {
-  DataState,
-  FooterModel,
-  HeaderUserMenuModel,
-  PortalNavItem,
-  SecondaryTabModel,
-  StatusTone,
-  UtilityBarModel,
-} from '../shared/portal.types'
+import type { Assignment, AssignmentQuestion, SubmissionStatus as BaseSubmissionStatus } from '../assignment/assignment.types'
+import type { DataState, PortalPageFrame, PortalShellModel, StatusTone } from '../shared/portal.types'
 
-export type SubmissionStatus = 'not_submitted' | 'draft' | 'submitted' | 'late'
+export type SubmissionStatus = BaseSubmissionStatus | 'not_submitted'
 export type GradingStatus = 'not_started' | 'pending' | 'published'
 export type FeedbackStatus = 'new' | 'read' | 'reply_required'
 export type CompletionStatus = 'complete' | 'draft' | 'missing'
 export type SupportTone = 'neutral' | 'warning' | 'positive'
 export type ClassDetailTab = 'overview' | 'assignments' | 'results' | 'announcements'
-export type AssignmentFilter = 'all' | 'not_submitted' | 'submitted' | 'late' | 'graded'
+export type AssignmentFilter = 'all' | 'not_submitted' | 'submitted' | 'overdue'
+export type AssignmentSort = 'recent' | 'deadline' | 'status'
+export type ResultSort = 'updated' | 'score'
+export type FeedbackFilter = 'all' | 'new' | 'reply_required' | 'read'
 
 export interface StudentProfile {
   id: string
@@ -44,44 +40,25 @@ export interface AssignmentRequirement {
   detail: string
 }
 
-export interface QuestionRubricItem {
-  id: string
-  label: string
-  detail: string
-  maxScore: number
-}
-
 export interface StudentUploadedFile {
   id: string
   fileName: string
   sizeLabel: string
 }
 
-export interface AssignmentQuestion {
-  id: string
-  order: number
-  prompt: string
-  attachmentName?: string
-  rubric: QuestionRubricItem[]
+export interface StudentAssignmentQuestion extends AssignmentQuestion {
   answerText: string
   uploadedFiles: StudentUploadedFile[]
   completionStatus: CompletionStatus
 }
 
-export interface StudentAssignment {
-  id: string
-  classId: string
-  title: string
-  deadline: string
+export interface StudentAssignment extends Assignment {
   submissionStatus: SubmissionStatus
   gradingStatus: GradingStatus
   score?: number
   submittedAt?: string
-  requirements: AssignmentRequirement[]
-  instructions: string[]
-  questions: AssignmentQuestion[]
-  allowedSubmissionFormats: string[]
   draftSavedAt?: string
+  questions: StudentAssignmentQuestion[]
 }
 
 export interface ResultRubricStatus {
@@ -152,14 +129,14 @@ export interface QuickGuideEntry {
   href: string
 }
 
-export interface StudentPortalShellModel {
-  utilityBar: UtilityBarModel
-  brandName: string
-  brandSubtitle: string
-  navItems: PortalNavItem[]
-  userMenu: HeaderUserMenuModel
-  footer: FooterModel
+export interface StudentNotification {
+  id: string
+  content: string
+  createdAt: string
+  isRead: boolean
 }
+
+export type StudentPortalShellModel = PortalShellModel
 
 export interface StudentRouteContext {
   dataState: DataState
@@ -178,6 +155,9 @@ export interface StudentAssignmentRow {
   title: string
   classLabel: string
   deadlineLabel: string
+  dueAt: string
+  allowLateSubmission: boolean
+  submissionStatus: SubmissionStatus
   submissionLabel: string
   submissionTone: StatusTone
   gradingLabel: string
@@ -193,6 +173,7 @@ export interface StudentClassRow {
   classCode: string
   openAssignmentsLabel: string
   progressLabel: string
+  progressPercent: number
   href: string
 }
 
@@ -218,11 +199,4 @@ export interface FeedbackThreadRow {
   href: string
 }
 
-export interface StudentPageFrame {
-  shell: StudentPortalShellModel
-  pageTitle: string
-  pageDescription: string
-  breadcrumbs: { label: string; href?: string }[]
-  tabs?: SecondaryTabModel[]
-}
-
+export type StudentPageFrame = PortalPageFrame
