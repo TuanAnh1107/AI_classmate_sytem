@@ -10,40 +10,52 @@ type LecturerNotificationsPageProps = {
 
 export function LecturerNotificationsPage({ dataState, notificationId }: LecturerNotificationsPageProps) {
   const model = useLecturerNotificationsController(dataState, notificationId)
+  const activeRow = notificationId ? model.rows.find((row) => row.id === notificationId) : undefined
+
+  if (activeRow) {
+    return (
+      <LecturerPortalLayout frame={model.frame}>
+        <div className="page-workspace">
+          <section className="portal-section-card portal-page-transition" style={{ maxWidth: 760, margin: '0 auto' }}>
+            <div className="portal-button-row" style={{ marginBottom: 16 }}>
+              <a href="?portal=lecturer&page=notifications" className="portal-outline-button">
+                Quay lại danh sách
+              </a>
+            </div>
+
+            <div className="content-panel" style={{ border: 'none', padding: 0, boxShadow: 'none' }}>
+              <p className="portal-section-kicker">Thông báo</p>
+              <h2 style={{ marginBottom: 8 }}>Chi tiết thông báo</h2>
+              <p className="portal-muted-text" style={{ marginBottom: 16 }}>{activeRow.createdAtLabel}</p>
+              <div style={{ fontSize: 14, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{activeRow.content}</div>
+            </div>
+          </section>
+        </div>
+      </LecturerPortalLayout>
+    )
+  }
 
   return (
     <LecturerPortalLayout frame={model.frame}>
-      <section className="student-page-body">
-        <div className="workflow-command-bar workflow-command-bar-compact">
-          <div className="workflow-command-copy">
-            <p className="portal-page-kicker">Thông báo</p>
-            <h2>Inbox tín hiệu giảng dạy cần chú ý</h2>
-            <p>
-              Deadline, bài nộp mới và phản hồi được gom vào một inbox thống nhất. Bạn lọc nhanh theo trạng thái rồi mở sâu
-              đúng một thông báo khi cần, thay vì đọc qua nhiều panel cùng lúc.
-            </p>
-          </div>
-        </div>
-
+      <div className="page-workspace">
         <NotificationInboxShell
-          kicker="Hộp thư giảng viên"
-          title="Tín hiệu cần xử lý"
-          description="Danh sách mặc định giữ ở mức summary-first. Chỉ khi chọn thông báo thì nội dung sâu hơn mới được mở ở panel chi tiết."
+          kicker="Thông báo"
+          title="Danh sách thông báo"
+          description="Chọn một thông báo để xem nội dung chi tiết."
           state={model.state}
           errorMessage={model.errorMessage}
           stats={model.stats}
           rows={model.rows}
-          selectedId={model.selectedId}
           searchValue={model.searchValue}
           onSearchChange={model.onSearchChange}
           filterValue={model.filterValue}
           onFilterChange={model.onFilterChange}
           loadingTitle="Đang tải thông báo"
-          loadingDescription="Hệ thống đang đồng bộ tín hiệu mới nhất cho giảng viên."
+          loadingDescription="Hệ thống đang lấy các cập nhật mới cho giảng viên."
           emptyTitle="Không có thông báo phù hợp"
-          emptyDescription="Bộ lọc hiện tại chưa khớp thông báo nào cần chú ý."
+          emptyDescription="Thử đổi bộ lọc hoặc quay lại sau khi có cập nhật mới."
         />
-      </section>
+      </div>
     </LecturerPortalLayout>
   )
 }

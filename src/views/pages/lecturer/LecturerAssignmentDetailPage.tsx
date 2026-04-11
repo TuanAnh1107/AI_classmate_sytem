@@ -5,8 +5,8 @@ import { buildLecturerPortalHref } from '../../../models/lecturer/lecturer.mappe
 import { CollapsibleSection } from '../../components/shared/CollapsibleSection'
 import { EmptyState } from '../../components/shared/EmptyState'
 import { ErrorState } from '../../components/shared/ErrorState'
+import { InfoHeader } from '../../components/shared/InfoHeader'
 import { LoadingState } from '../../components/shared/LoadingState'
-import { MetricBar } from '../../components/shared/MetricBar'
 import { PortalSectionTabs } from '../../components/shared/PortalSectionTabs'
 import { StatusBadge } from '../../components/shared/StatusBadge'
 import { LecturerPortalLayout } from '../../layouts/LecturerPortalLayout'
@@ -45,7 +45,7 @@ export function LecturerAssignmentDetailPage({ dataState, assignmentId }: Lectur
   if (model.state === 'loading') {
     return (
       <LecturerPortalLayout frame={model.frame}>
-        <LoadingState />
+        <LoadingState description="Đang tải chi tiết bài tập." />
       </LecturerPortalLayout>
     )
   }
@@ -71,29 +71,28 @@ export function LecturerAssignmentDetailPage({ dataState, assignmentId }: Lectur
 
   return (
     <LecturerPortalLayout frame={model.frame}>
-      <div className="page-title-bar">
-        <div>
-          <h1>{assignment.title}</h1>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px', flexWrap: 'wrap' }}>
-            <StatusBadge label={assignmentStatus.label} tone={assignmentStatus.tone} />
-            {model.deadlineLabel ? <StatusBadge label={model.deadlineLabel} tone={model.deadlineTone ?? 'neutral'} /> : null}
-            {model.allowLateLabel ? <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{model.allowLateLabel}</span> : null}
-          </div>
-        </div>
-        <div className="page-title-bar-actions">
-          <a className="portal-outline-button" href={buildLecturerPortalHref('assignment-edit', { assignmentId: assignment.id })}>
-            Chỉnh sửa
-          </a>
-          <a className="portal-primary-button" href={buildLecturerPortalHref('submission-list', { assignmentId: assignment.id })}>
-            Mở queue
-          </a>
-        </div>
-      </div>
+      <div className="page-workspace">
+        <InfoHeader
+          title={assignment.title}
+          subtitle={model.deadlineLabel ? `Hạn nộp: ${model.deadlineLabel}` : undefined}
+          badges={[{ label: assignmentStatus.label, tone: assignmentStatus.tone }]}
+          stats={model.stats.map((item) => ({ label: item.label, value: item.value }))}
+          actions={
+            <>
+              <a className="portal-outline-button" href={buildLecturerPortalHref('assignments')}>
+                Quay lại danh sách
+              </a>
+              <a className="portal-outline-button" href={buildLecturerPortalHref('assignment-edit', { assignmentId: assignment.id })}>
+                Chỉnh sửa
+              </a>
+              <a className="portal-primary-button" href={buildLecturerPortalHref('submission-list', { assignmentId: assignment.id })}>
+                Mở hàng chấm
+              </a>
+            </>
+          }
+        />
 
-      <div className="student-page-body portal-page-transition">
-        <MetricBar items={model.stats} />
-
-        <div className="content-panel" style={{ padding: 0 }}>
+        <section className="content-panel" style={{ padding: 0 }}>
           <div style={{ padding: '12px 16px 0' }}>
             <PortalSectionTabs items={tabs} activeId={activeTab} onChange={(id) => setActiveTab(id as TabId)} />
           </div>
@@ -108,26 +107,26 @@ export function LecturerAssignmentDetailPage({ dataState, assignmentId }: Lectur
                     <th>Số lần nộp</th>
                     <th>Điểm</th>
                     <th>Phản hồi</th>
-                    <th style={{ width: 96 }}></th>
+                    <th style={{ width: 120 }}></th>
                   </tr>
                 </thead>
                 <tbody>
                   {model.submittedStudents.map((student) => (
                     <tr key={student.id}>
                       <td>
-                        <strong style={{ fontSize: '13px' }}>{student.studentName}</strong>
+                        <strong style={{ fontSize: 13 }}>{student.studentName}</strong>
                         <div className="compact-table-meta">{student.studentCode}</div>
                       </td>
                       <td>
                         <StatusBadge label={student.submissionLabel} tone={student.submissionTone} />
                       </td>
-                      <td style={{ fontSize: '13px' }}>{student.attemptsLabel}</td>
-                      <td style={{ fontSize: '13px', fontWeight: 600 }}>{student.scoreLabel}</td>
-                      <td style={{ fontSize: '13px' }}>{student.feedbackLabel}</td>
+                      <td style={{ fontSize: 13 }}>{student.attemptsLabel}</td>
+                      <td style={{ fontSize: 13, fontWeight: 600 }}>{student.scoreLabel}</td>
+                      <td style={{ fontSize: 13 }}>{student.feedbackLabel}</td>
                       <td>
                         {student.href ? (
-                          <a className="portal-outline-button" href={student.href}>
-                            Xem
+                          <a className="portal-primary-button" href={student.href}>
+                            Xem bài nộp
                           </a>
                         ) : null}
                       </td>
@@ -136,8 +135,8 @@ export function LecturerAssignmentDetailPage({ dataState, assignmentId }: Lectur
                 </tbody>
               </table>
             ) : (
-              <div style={{ padding: '16px' }}>
-                <EmptyState title="Chưa có sinh viên nộp bài" description="Sinh viên nộp bài sẽ xuất hiện ở đây." />
+              <div style={{ padding: 16 }}>
+                <EmptyState title="Chưa có sinh viên nộp bài" description="Danh sách sinh viên đã nộp sẽ xuất hiện tại đây." />
               </div>
             )
           ) : null}
@@ -156,27 +155,23 @@ export function LecturerAssignmentDetailPage({ dataState, assignmentId }: Lectur
                 <tbody>
                   {model.missingStudents.map((student) => (
                     <tr key={student.id}>
-                      <td>
-                        <strong style={{ fontSize: '13px' }}>{student.studentName}</strong>
-                      </td>
-                      <td style={{ fontSize: '13px' }}>{student.studentCode}</td>
-                      <td>
-                        <StatusBadge label={student.submissionLabel} tone={student.submissionTone} />
-                      </td>
-                      <td style={{ fontSize: '13px' }}>{student.attemptsLabel}</td>
+                      <td><strong style={{ fontSize: 13 }}>{student.studentName}</strong></td>
+                      <td style={{ fontSize: 13 }}>{student.studentCode}</td>
+                      <td><StatusBadge label={student.submissionLabel} tone={student.submissionTone} /></td>
+                      <td style={{ fontSize: 13 }}>{student.attemptsLabel}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             ) : (
-              <div style={{ padding: '16px' }}>
-                <EmptyState title="Tất cả sinh viên đã nộp" description="Không có sinh viên nào bị thiếu bài ở thời điểm hiện tại." />
+              <div style={{ padding: 16 }}>
+                <EmptyState title="Tất cả sinh viên đã nộp" description="Hiện tại không còn sinh viên nào thiếu bài." />
               </div>
             )
           ) : null}
-        </div>
+        </section>
 
-        <CollapsibleSection title="Thông tin bài tập">
+        <CollapsibleSection title="Thông tin bài tập" defaultOpen={false}>
           <dl className="info-pair-list">
             <div>
               <dt>Lớp</dt>

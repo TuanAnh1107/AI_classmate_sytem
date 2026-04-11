@@ -1,7 +1,7 @@
+import { useMemo, useState } from 'react'
 import type { DataState } from '../../../models/shared/portal.types'
 import { useStudentClassesController } from '../../../controllers/student/useStudentClassesController'
 import { ClassesTable } from '../../components/student/ClassesTable'
-import { StudentFilterToolbar } from '../../components/student/StudentFilterToolbar'
 import { EmptyState } from '../../components/shared/EmptyState'
 import { LoadingTable } from '../../components/shared/LoadingTable'
 import { StudentPortalLayout } from '../../layouts/StudentPortalLayout'
@@ -12,53 +12,92 @@ type StudentClassesPageProps = {
 
 export function StudentClassesPage({ dataState }: StudentClassesPageProps) {
   const model = useStudentClassesController(dataState)
-  const totalOpenAssignments = model.rows.reduce((sum, row) => sum + Number.parseInt(row.openAssignmentsLabel, 10), 0)
-  const averageProgress = model.rows.length
-    ? Math.round(model.rows.reduce((sum, row) => sum + row.progressPercent, 0) / model.rows.length)
-    : 0
+  const [semesterFilter, setSemesterFilter] = useState('all')
+
+  const semesterOptions = useMemo(() => {
+    const values = Array.from(new Set(model.rows.map((row) => row.semester)))
+    return ['all', ...values]
+  }, [model.rows])
+
+  const visibleRows = useMemo(() => {
+    if (semesterFilter === 'all') {
+      return model.rows
+    }
+    return model.rows.filter((row) => row.semester === semesterFilter)
+  }, [model.rows, semesterFilter])
+
+  const totalOpenAssignments = visibleRows.reduce((sum, row) => {
+    const count = Number.parseInt(row.openAssignmentsLabel, 10)
+    return sum + (Number.isNaN(count) ? 0 : count)
+  }, 0)
 
   return (
     <StudentPortalLayout frame={model.frame}>
       <section className="student-page-body">
-        <section className="student-focus-hero">
-          <div className="student-focus-copy">
-            <p className="portal-page-kicker">Classes overview</p>
-            <h1>Lớp học đang theo dõi</h1>
-            <p>Quét nhanh lớp nào đang nhiều bài mở, lớp nào tiến độ còn thấp và đi thẳng vào lớp cần xử lý tiếp.</p>
+        <section className="student-sis-shell">
+          <header className="student-sis-head">
+            <div>
+              <p className="portal-page-kicker">Khu học phần</p>
+              <h1>Danh sách lớp học</h1>
+              <p>Hiển thị theo kiểu bảng học vụ để quét nhanh học phần, lịch học, giảng viên và số bài tập đang mở.</p>
+            </div>
+
+            <div className="student-sis-summary">
+              <article>
+                <span>Tổng lớp</span>
+                <strong>{visibleRows.length}</strong>
+              </article>
+              <article>
+                <span>Bài tập mở</span>
+                <strong>{totalOpenAssignments}</strong>
+              </article>
+            </div>
+          </header>
+
+          <div className="student-sis-toolbar">
+            <div className="student-sis-filter-group">
+              <label className="student-sis-filter">
+                <span>Kỳ</span>
+                <select value={semesterFilter} onChange={(event) => setSemesterFilter(event.target.value)}>
+                  {semesterOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option === 'all' ? 'Tất cả học kỳ' : option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="student-sis-search">
+                <input
+                  type="text"
+                  placeholder="Nhập mã lớp, mã môn học hoặc tên lớp"
+                  value={model.searchValue}
+                  onChange={(event) => model.onSearchChange(event.target.value)}
+                />
+              </label>
+            </div>
           </div>
+
+          <div className="student-sis-tabs">
+            <button type="button" className="student-sis-tab is-active">
+              Danh sách lớp
+            </button>
+            <a className="student-sis-tab" href="?portal=student&page=assignments">
+              Bài tập
+            </a>
+            <a className="student-sis-tab" href="?portal=student&page=results">
+              Kết quả
+            </a>
+          </div>
+
+          {model.state === 'loading' ? <LoadingTable columns={6} /> : null}
+          {model.state === 'error' ? <div className="portal-inline-error">{model.errorMessage}</div> : null}
+          {model.state === 'empty' || !visibleRows.length ? (
+            <EmptyState title="Chưa có lớp học nào" description="Danh sách học phần sẽ xuất hiện khi bạn được ghi danh vào lớp." />
+          ) : null}
+
+          {model.state === 'ready' && visibleRows.length ? <ClassesTable rows={visibleRows} /> : null}
         </section>
-
-        <div className="student-summary-strip">
-          <article className="student-summary-card">
-            <span>Tổng lớp</span>
-            <strong>{model.rows.length}</strong>
-          </article>
-          <article className="student-summary-card">
-            <span>Bài đang mở</span>
-            <strong>{totalOpenAssignments}</strong>
-          </article>
-          <article className="student-summary-card">
-            <span>Tiến độ trung bình</span>
-            <strong>{averageProgress}%</strong>
-          </article>
-        </div>
-
-        <StudentFilterToolbar
-          sticky
-          search={{
-            value: model.searchValue,
-            onChange: model.onSearchChange,
-            placeholder: 'Tìm theo mã lớp, tên lớp hoặc giảng viên',
-            helper: 'Giữ danh sách ngắn gọn để vào đúng lớp cần xem thay vì quét toàn bộ học phần.',
-          }}
-        />
-
-        {model.state === 'loading' ? <LoadingTable columns={3} /> : null}
-        {model.state === 'error' ? <div className="portal-inline-error">{model.errorMessage}</div> : null}
-        {model.state === 'empty' ? (
-          <EmptyState title="Chưa có lớp học nào" description="Danh sách lớp sẽ xuất hiện khi sinh viên được ghi danh vào học phần." />
-        ) : null}
-        {model.state === 'ready' ? <ClassesTable rows={model.rows} /> : null}
       </section>
     </StudentPortalLayout>
   )

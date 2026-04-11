@@ -1,4 +1,4 @@
-import type { DataState, StatusTone } from '../../models/shared/portal.types'
+﻿import type { DataState, StatusTone } from '../../models/shared/portal.types'
 import type { LecturerPageFrame } from '../../models/lecturer/lecturer.types'
 import { assignmentsMock, submissionsMock } from '../../models/assignment/assignment.mock'
 import { lecturerProfileMock } from '../../models/lecturer/lecturer.mock'
@@ -63,12 +63,8 @@ export const lecturerAssignmentSortOptions = [
 
 function getDeadlineTone(dueAt: string): StatusTone {
   const diff = new Date(dueAt).getTime() - Date.now()
-  if (diff < 0) {
-    return 'danger'
-  }
-  if (diff <= 1000 * 60 * 60 * 24 * 3) {
-    return 'warning'
-  }
+  if (diff < 0) return 'danger'
+  if (diff <= 1000 * 60 * 60 * 24 * 3) return 'warning'
   return 'neutral'
 }
 
@@ -89,8 +85,8 @@ export function useLecturerAssignmentsController(state: DataState): LecturerAssi
 
   const frame: LecturerPageFrame = {
     shell,
-    pageTitle: '',
-    pageDescription: '',
+    pageTitle: 'Bài tập',
+    pageDescription: 'Chọn lớp phụ trách, xem số lượng đã nộp và đi thẳng vào hàng chấm.',
     breadcrumbs: [
       { label: 'Trang chủ', href: buildLecturerPortalHref('dashboard') },
       { label: 'Bài tập' },
@@ -108,7 +104,7 @@ export function useLecturerAssignmentsController(state: DataState): LecturerAssi
     return {
       id: classId,
       code: classId.toUpperCase(),
-      title: classAssignments[0]?.classId.toUpperCase() ?? classId.toUpperCase(),
+      title: `Lớp ${classId.toUpperCase()}`,
       helperText: `${students.length} sinh viên`,
       openAssignmentsLabel: `${classAssignments.filter((assignment) => assignment.status === 'published').length} bài đang mở`,
       pendingLabel: `${pendingCount} bài chờ chấm`,
@@ -153,47 +149,39 @@ export function useLecturerAssignmentsController(state: DataState): LecturerAssi
       }
     : undefined
 
+  const baseModel = {
+    frame,
+    classes,
+    selectedClass: selectedClassMeta,
+    filters: {
+      search: query.search,
+      status: query.status,
+      sort: sortValue,
+    },
+    stats,
+    setQuery,
+  }
+
   if (state === 'loading') {
     return {
-      frame,
+      ...baseModel,
       state,
-      classes,
-      selectedClass: selectedClassMeta,
       rows: [],
-      filters: {
-        search: query.search,
-        status: query.status,
-        sort: sortValue,
-      },
-      stats,
-      setQuery,
     }
   }
 
   if (state === 'error') {
     return {
-      frame,
+      ...baseModel,
       state,
-      classes,
-      selectedClass: selectedClassMeta,
       rows: [],
-      filters: {
-        search: query.search,
-        status: query.status,
-        sort: sortValue,
-      },
-      stats,
-      setQuery,
-      errorMessage: 'Không thể tải workspace bài tập của giảng viên.',
+      errorMessage: 'Không thể tải danh sách bài tập của giảng viên.',
     }
   }
 
   const rows = selectedAssignments
     .filter((assignment) => {
-      if (!query.search) {
-        return true
-      }
-
+      if (!query.search) return true
       const keyword = query.search.toLowerCase()
       return assignment.title.toLowerCase().includes(keyword) || assignment.id.toLowerCase().includes(keyword)
     })
@@ -227,8 +215,8 @@ export function useLecturerAssignmentsController(state: DataState): LecturerAssi
         deadlineTone: getDeadlineTone(assignment.dueAt),
         statusLabel: statusMeta.label,
         statusTone: statusMeta.tone,
-        submittedLabel: `${submissions.length}/${students.length} đã nộp`,
-        pendingGradeLabel: `${submissions.filter((submission) => submission.score === undefined).length} chờ chấm`,
+        submittedLabel: `${submissions.length}/${students.length} sinh viên đã nộp`,
+        pendingGradeLabel: `${submissions.filter((submission) => submission.score === undefined).length} bài chờ chấm`,
         detailHref: buildLecturerPortalHref('assignment-detail', { assignmentId: assignment.id }),
         queueHref: buildLecturerPortalHref('submission-list', { assignmentId: assignment.id }),
         editHref: buildLecturerPortalHref('assignment-edit', { assignmentId: assignment.id }),
@@ -237,33 +225,15 @@ export function useLecturerAssignmentsController(state: DataState): LecturerAssi
 
   if (state === 'empty' || !selectedClassId || !rows.length) {
     return {
-      frame,
+      ...baseModel,
       state: 'empty',
-      classes,
-      selectedClass: selectedClassMeta,
       rows: [],
-      filters: {
-        search: query.search,
-        status: query.status,
-        sort: sortValue,
-      },
-      stats,
-      setQuery,
     }
   }
 
   return {
-    frame,
+    ...baseModel,
     state,
-    classes,
-    selectedClass: selectedClassMeta,
     rows,
-    filters: {
-      search: query.search,
-      status: query.status,
-      sort: sortValue,
-    },
-    stats,
-    setQuery,
   }
 }

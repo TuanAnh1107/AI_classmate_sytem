@@ -1,4 +1,4 @@
-import type { DataState, StatusTone } from '../../models/shared/portal.types'
+﻿import type { DataState, StatusTone } from '../../models/shared/portal.types'
 import type { AssignmentFilter, AssignmentSort, StudentPageFrame } from '../../models/student/student.types'
 import {
   feedbackThreadsMock,
@@ -10,6 +10,7 @@ import {
 import {
   buildStudentPortalHref,
   formatPortalDateTime,
+  getAssignmentFilterLabel,
   getClassLabel,
   getCompletionLabel,
   getGradingStatusMeta,
@@ -32,6 +33,10 @@ export interface StudentAssignmentClassCard {
   code: string
   name: string
   lecturerName: string
+  semester: string
+  scheduleLabel: string
+  roomLabel: string
+  deliveryMode: string
   helperText: string
   openAssignmentsLabel: string
   progressLabel: string
@@ -105,6 +110,7 @@ export interface StudentAssignmentDetailViewModel {
       lecturerFeedback: string
       updatedAtLabel: string
       resultHref: string
+      feedbackStatus: typeof studentResultsMock[number]['feedbackStatus']
     }
   }
   errorMessage?: string
@@ -112,17 +118,22 @@ export interface StudentAssignmentDetailViewModel {
 
 const assignmentFilters: AssignmentFilter[] = ['not_submitted', 'submitted', 'overdue']
 
-function matchesFilter(filter: AssignmentFilter, assignment: typeof studentAssignmentsMock[number]) {
-  const dueTime = new Date(assignment.dueAt).getTime()
-  const isOverdue = dueTime < Date.now() && (assignment.submissionStatus === 'not_submitted' || assignment.submissionStatus === 'draft')
+function isNotSubmitted(assignment: typeof studentAssignmentsMock[number]) {
+  return assignment.submissionStatus === 'not_submitted' || assignment.submissionStatus === 'draft'
+}
 
+function isOverdue(assignment: typeof studentAssignmentsMock[number]) {
+  return new Date(assignment.dueAt).getTime() < Date.now() && isNotSubmitted(assignment)
+}
+
+function matchesFilter(filter: AssignmentFilter, assignment: typeof studentAssignmentsMock[number]) {
   switch (filter) {
     case 'not_submitted':
-      return !isOverdue && (assignment.submissionStatus === 'not_submitted' || assignment.submissionStatus === 'draft')
+      return !isOverdue(assignment) && isNotSubmitted(assignment)
     case 'submitted':
       return assignment.submissionStatus === 'submitted' || assignment.submissionStatus === 'late'
     case 'overdue':
-      return isOverdue
+      return isOverdue(assignment)
     case 'all':
     default:
       return true
@@ -133,39 +144,49 @@ function sortAssignments(sort: AssignmentSort, assignments: typeof studentAssign
   const sorted = [...assignments]
 
   switch (sort) {
-    case 'deadline':
-      sorted.sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())
-      break
     case 'status':
       sorted.sort((a, b) => a.submissionStatus.localeCompare(b.submissionStatus))
       break
     case 'recent':
-    default:
       sorted.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      break
+    case 'deadline':
+    default:
+      sorted.sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())
       break
   }
 
   return sorted
 }
 
-function getAssignmentDisplayMeta(assignment: typeof studentAssignmentsMock[number]) {
-  const dueTime = new Date(assignment.dueAt).getTime()
-  const isOverdue = dueTime < Date.now() && (assignment.submissionStatus === 'not_submitted' || assignment.submissionStatus === 'draft')
-  const result = studentResultsMock.find((item) => item.assignmentId === assignment.id)
+function getDeadlineTone(dueAt: string): StatusTone {
+  const diff = new Date(dueAt).getTime() - Date.now()
+  if (diff < 0) return 'danger'
+  if (diff <= 1000 * 60 * 60 * 24 * 3) return 'warning'
+  return 'neutral'
+}
 
-  if (isOverdue) {
+function getAssignmentDisplayMeta(assignment: typeof studentAssignmentsMock[number]) {
+  const result = studentResultsMock.find((item) => item.assignmentId === assignment.id)
+  const feedbackThread = feedbackThreadsMock.find((item) => item.assignmentId === assignment.id)
+  const hasStudentReply = feedbackThread?.messages.some((message) => message.authorRole === 'student') ?? false
+  const isAppeal = Boolean(result) && (result?.feedbackStatus === 'reply_required' || hasStudentReply)
+
+  if (isAppeal) {
     return {
-      statusLabel: 'Quá hạn',
-      statusTone: 'danger' as StatusTone,
-      primaryActionLabel: 'Xem chi tiết',
+      statusLabel: 'Đang phúc khảo',
+      statusTone: 'warning' as StatusTone,
+      scoreLabel: result ? `${result.totalScore.toFixed(1)}/${result.maxScore}` : undefined,
+      primaryActionLabel: 'Xem phản hồi',
       primaryActionHref: buildStudentPortalHref('assignment-detail', { assignmentId: assignment.id }),
     }
   }
 
   if (result) {
     return {
-      statusLabel: `Điểm ${result.totalScore.toFixed(1)}/${result.maxScore}`,
+      statusLabel: 'Điểm số',
       statusTone: 'success' as StatusTone,
+      scoreLabel: `${result.totalScore.toFixed(1)}/${result.maxScore}`,
       primaryActionLabel: 'Xem kết quả',
       primaryActionHref: buildStudentPortalHref('result-detail', { resultId: result.id }),
     }
@@ -173,8 +194,9 @@ function getAssignmentDisplayMeta(assignment: typeof studentAssignmentsMock[numb
 
   if (assignment.submissionStatus === 'submitted' || assignment.submissionStatus === 'late') {
     return {
-      statusLabel: 'Chưa có điểm',
+      statusLabel: 'Chưa được chấm',
       statusTone: 'info' as StatusTone,
+      scoreLabel: undefined,
       primaryActionLabel: 'Xem chi tiết',
       primaryActionHref: buildStudentPortalHref('assignment-detail', { assignmentId: assignment.id }),
     }
@@ -182,24 +204,14 @@ function getAssignmentDisplayMeta(assignment: typeof studentAssignmentsMock[numb
 
   return {
     statusLabel: 'Chưa nộp',
-    statusTone: 'warning' as StatusTone,
-    primaryActionLabel: assignment.submissionStatus === 'draft' ? 'Tiếp tục nộp bài' : 'Xem chi tiết',
+    statusTone: isOverdue(assignment) ? ('danger' as StatusTone) : ('warning' as StatusTone),
+    scoreLabel: undefined,
+    primaryActionLabel: assignment.submissionStatus === 'draft' ? 'Tiếp tục nộp' : 'Xem chi tiết',
     primaryActionHref:
       assignment.submissionStatus === 'draft'
         ? buildStudentPortalHref('assignment-submit', { assignmentId: assignment.id })
         : buildStudentPortalHref('assignment-detail', { assignmentId: assignment.id }),
   }
-}
-
-function getDeadlineTone(dueAt: string): StatusTone {
-  const diff = new Date(dueAt).getTime() - Date.now()
-  if (diff < 0) {
-    return 'danger'
-  }
-  if (diff <= 1000 * 60 * 60 * 24 * 3) {
-    return 'warning'
-  }
-  return 'neutral'
 }
 
 export function useStudentAssignmentsController(
@@ -218,7 +230,7 @@ export function useStudentAssignmentsController(
   const frame: StudentPageFrame = {
     shell,
     pageTitle: 'Bài tập',
-    pageDescription: 'Chọn lớp trước, sau đó tập trung vào đúng nhóm bài cần xử lý để không bị loãng thông tin.',
+    pageDescription: 'Chọn lớp học trước, sau đó lọc bài tập theo trạng thái để thao tác nhanh hơn.',
     breadcrumbs: [
       { label: 'Trang chủ', href: buildStudentPortalHref('dashboard') },
       { label: 'Bài tập' },
@@ -240,7 +252,11 @@ export function useStudentAssignmentsController(
       code: studentClass.code,
       name: studentClass.name,
       lecturerName: studentClass.lecturerName,
-      helperText: nextDeadline ? `Hạn gần nhất ${formatPortalDateTime(nextDeadline.dueAt)}` : 'Chưa có hạn nộp mới',
+      semester: studentClass.semester,
+      scheduleLabel: studentClass.schedule,
+      roomLabel: studentClass.room,
+      deliveryMode: 'Offline',
+      helperText: nextDeadline ? `Hạn gần nhất: ${formatPortalDateTime(nextDeadline.dueAt)}` : 'Chưa có hạn nộp mới',
       openAssignmentsLabel: `${rows.filter((assignment) => assignment.status === 'published').length} bài đang mở`,
       progressLabel: `${rows.filter((assignment) => assignment.gradingStatus === 'published').length}/${rows.length} bài đã có điểm`,
       href: buildStudentPortalHref('assignments', {
@@ -255,7 +271,7 @@ export function useStudentAssignmentsController(
 
   const filters = assignmentFilters.map((filterKey) => ({
     key: filterKey,
-    label: filterKey === 'not_submitted' ? 'Chưa nộp' : filterKey === 'submitted' ? 'Đã nộp' : 'Quá hạn',
+    label: getAssignmentFilterLabel(filterKey),
     href: buildStudentPortalHref('assignments', {
       filter: filterKey,
       classId: selectedClassId,
@@ -269,48 +285,38 @@ export function useStudentAssignmentsController(
   const onSearchChange = (value: string) => setQuery({ search: value })
   const onSortChange = (value: AssignmentSort) => setQuery({ sort: value })
 
+  const baseModel = {
+    frame,
+    classes,
+    selectedClass: selectedClass
+      ? {
+          id: selectedClass.id,
+          title: getClassLabel(selectedClass),
+          lecturerName: selectedClass.lecturerName,
+          overview: selectedClass.overview,
+        }
+      : undefined,
+    filters,
+    searchValue: query.search,
+    sortValue: safeSort,
+    onSearchChange,
+    onSortChange,
+  }
+
   if (state === 'loading') {
     return {
       state,
-      frame,
-      classes,
-      selectedClass: selectedClass
-        ? {
-            id: selectedClass.id,
-            title: getClassLabel(selectedClass),
-            lecturerName: selectedClass.lecturerName,
-            overview: selectedClass.overview,
-          }
-        : undefined,
-      filters,
+      ...baseModel,
       rows: [],
-      searchValue: query.search,
-      sortValue: safeSort,
-      onSearchChange,
-      onSortChange,
     }
   }
 
   if (state === 'error') {
     return {
       state,
-      frame,
-      classes,
-      selectedClass: selectedClass
-        ? {
-            id: selectedClass.id,
-            title: getClassLabel(selectedClass),
-            lecturerName: selectedClass.lecturerName,
-            overview: selectedClass.overview,
-          }
-        : undefined,
-      filters,
+      ...baseModel,
       rows: [],
-      searchValue: query.search,
-      sortValue: safeSort,
-      onSearchChange,
-      onSortChange,
-      errorMessage: 'Không thể tải khu vực bài tập vào lúc này.',
+      errorMessage: 'Không thể tải danh sách bài tập vào lúc này.',
     }
   }
 
@@ -339,7 +345,7 @@ export function useStudentAssignmentsController(
         deadlineTone: getDeadlineTone(assignment.dueAt),
         statusLabel: meta.statusLabel,
         statusTone: meta.statusTone,
-        scoreLabel: assignment.score !== undefined ? `${assignment.score.toFixed(1)}/${assignment.maxScore}` : undefined,
+        scoreLabel: meta.scoreLabel,
         primaryActionLabel: meta.primaryActionLabel,
         primaryActionHref: meta.primaryActionHref,
         secondaryActionHref: buildStudentPortalHref('assignment-detail', { assignmentId: assignment.id }),
@@ -350,41 +356,15 @@ export function useStudentAssignmentsController(
   if (state === 'empty' || !selectedClass || !rows.length) {
     return {
       state: 'empty',
-      frame,
-      classes,
-      selectedClass: selectedClass
-        ? {
-            id: selectedClass.id,
-            title: getClassLabel(selectedClass),
-            lecturerName: selectedClass.lecturerName,
-            overview: selectedClass.overview,
-          }
-        : undefined,
-      filters,
+      ...baseModel,
       rows: [],
-      searchValue: query.search,
-      sortValue: safeSort,
-      onSearchChange,
-      onSortChange,
     }
   }
 
   return {
     state,
-    frame,
-    classes,
-    selectedClass: {
-      id: selectedClass.id,
-      title: getClassLabel(selectedClass),
-      lecturerName: selectedClass.lecturerName,
-      overview: selectedClass.overview,
-    },
-    filters,
+    ...baseModel,
     rows,
-    searchValue: query.search,
-    sortValue: safeSort,
-    onSearchChange,
-    onSortChange,
   }
 }
 
@@ -472,6 +452,7 @@ export function useStudentAssignmentDetailController(
             lecturerFeedback: result.lecturerFeedback,
             updatedAtLabel: formatPortalDateTime(result.updatedAt),
             resultHref: buildStudentPortalHref('result-detail', { resultId: result.id }),
+            feedbackStatus: result.feedbackStatus,
           }
         : undefined,
     },

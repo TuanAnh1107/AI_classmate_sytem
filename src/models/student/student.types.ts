@@ -171,6 +171,10 @@ export interface StudentClassRow {
   title: string
   lecturerName: string
   classCode: string
+  semester: string
+  scheduleLabel: string
+  roomLabel: string
+  deliveryMode: string
   openAssignmentsLabel: string
   progressLabel: string
   progressPercent: number

@@ -1,5 +1,5 @@
 import type { DataState, StatusTone } from '../../models/shared/portal.types'
-import type { StudentPageFrame, StudentClassRow, ClassDetailTab } from '../../models/student/student.types'
+import type { ClassDetailTab, StudentClassRow, StudentPageFrame } from '../../models/student/student.types'
 import {
   classAnnouncementsMock,
   studentAssignmentsMock,
@@ -81,10 +81,11 @@ export interface StudentClassDetailViewModel {
 export function useStudentClassesController(state: DataState): StudentClassesListViewModel {
   const shell = useStudentPortalShellController('classes')
   const { query, setQuery } = useStudentQueryParams()
+
   const frame: StudentPageFrame = {
     shell,
     pageTitle: 'Lớp học của tôi',
-    pageDescription: 'Theo dõi từng lớp đang tham gia, số bài đang mở và mức độ hoàn thành theo nhịp học thực tế.',
+    pageDescription: 'Danh sách học phần được trình bày theo kiểu bảng học vụ để quét nhanh lịch học, giảng viên và tiến độ.',
     breadcrumbs: [
       { label: 'Trang chủ', href: buildStudentPortalHref('dashboard') },
       { label: 'Lớp học của tôi' },
@@ -117,6 +118,7 @@ export function useStudentClassesController(state: DataState): StudentClassesLis
       if (!query.search) {
         return true
       }
+
       const keyword = query.search.toLowerCase()
       return (
         studentClass.name.toLowerCase().includes(keyword) ||
@@ -129,6 +131,10 @@ export function useStudentClassesController(state: DataState): StudentClassesLis
       title: studentClass.name,
       lecturerName: studentClass.lecturerName,
       classCode: studentClass.code,
+      semester: studentClass.semester,
+      scheduleLabel: studentClass.schedule,
+      roomLabel: studentClass.room,
+      deliveryMode: 'Offline',
       openAssignmentsLabel: `${studentClass.openAssignments} bài đang mở`,
       progressLabel: `${studentClass.completionPercent}% hoàn thành`,
       progressPercent: studentClass.completionPercent,

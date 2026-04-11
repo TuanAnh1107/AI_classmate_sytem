@@ -15,7 +15,7 @@ import { AdminTableShell } from '../../components/admin/AdminTableShell'
 import { AdminTableSkeleton } from '../../components/admin/AdminTableSkeleton'
 import { EmptyState } from '../../components/shared/EmptyState'
 import { ErrorState } from '../../components/shared/ErrorState'
-import { MetricBar } from '../../components/shared/MetricBar'
+import { InfoHeader } from '../../components/shared/InfoHeader'
 import { StatusBadge } from '../../components/shared/StatusBadge'
 import { AdminPortalLayout } from '../../layouts/AdminPortalLayout'
 
@@ -43,16 +43,17 @@ export function AdminClassesPage({ dataState }: AdminClassesPageProps) {
 
   return (
     <AdminPortalLayout frame={model.frame}>
-      <div className="page-title-bar">
-        <h1>Quản lý lớp học</h1>
-        <div className="page-title-bar-actions">
-          <button className="portal-outline-button">Phân công giảng viên</button>
-          <button className="portal-primary-button">Tạo lớp</button>
-        </div>
-      </div>
-
-      <div className="student-page-body portal-page-transition">
-        <MetricBar items={model.stats} />
+      <div className="page-workspace">
+        <InfoHeader
+          title="Quản lý lớp học"
+          stats={model.stats.map((s) => ({ label: s.label, value: s.value }))}
+          actions={
+            <>
+              <button className="portal-outline-button">Phân công giảng viên</button>
+              <button className="portal-primary-button">Tạo lớp</button>
+            </>
+          }
+        />
 
         <AdminFilterToolbar
           sticky

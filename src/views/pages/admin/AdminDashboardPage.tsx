@@ -1,12 +1,10 @@
 import { useMemo, useState } from 'react'
 import type { DataState } from '../../../models/shared/portal.types'
 import { useAdminDashboardController } from '../../../controllers/admin/useAdminDashboardController'
-import { CollapsibleSection } from '../../components/shared/CollapsibleSection'
-import { ContentPanel } from '../../components/shared/ContentPanel'
 import { EmptyState } from '../../components/shared/EmptyState'
 import { ErrorState } from '../../components/shared/ErrorState'
+import { InfoHeader } from '../../components/shared/InfoHeader'
 import { LoadingState } from '../../components/shared/LoadingState'
-import { MetricBar } from '../../components/shared/MetricBar'
 import { PortalSectionTabs } from '../../components/shared/PortalSectionTabs'
 import { StatusBadge } from '../../components/shared/StatusBadge'
 import { AdminPortalLayout } from '../../layouts/AdminPortalLayout'
@@ -32,14 +30,6 @@ export function AdminDashboardPage({ dataState }: AdminDashboardPageProps) {
 
   return (
     <AdminPortalLayout frame={model.frame}>
-      <div className="page-title-bar">
-        <h1>Admin Home</h1>
-        <div className="page-title-bar-actions">
-          <a className="portal-outline-button" href="?portal=admin&page=submissions">Submissions</a>
-          <a className="portal-primary-button" href="?portal=admin&page=users">Quản lý người dùng</a>
-        </div>
-      </div>
-
       {model.state === 'loading' ? <LoadingState title="Đang tải dashboard" description="Đang tổng hợp dữ liệu." /> : null}
       {model.state === 'error' ? <ErrorState description={model.errorMessage ?? 'Không thể tải dashboard.'} /> : null}
       {model.state === 'empty' ? (
@@ -47,10 +37,19 @@ export function AdminDashboardPage({ dataState }: AdminDashboardPageProps) {
       ) : null}
 
       {model.state === 'ready' ? (
-        <div className="student-page-body portal-page-transition">
-          <MetricBar items={model.stats.slice(0, 6)} />
+        <div className="page-workspace">
+          <InfoHeader
+            title="Admin Home"
+            stats={model.stats.slice(0, 6).map((s) => ({ label: s.label, value: s.value }))}
+            actions={
+              <>
+                <a className="portal-outline-button" href="?portal=admin&page=submissions">Submissions</a>
+                <a className="portal-primary-button" href="?portal=admin&page=users">Quản lý người dùng</a>
+              </>
+            }
+          />
 
-          <ContentPanel>
+          <div className="content-panel">
             <PortalSectionTabs items={tabs} activeId={activeTab} onChange={(id) => setActiveTab(id as AdminHomeTabId)} />
 
             {activeTab === 'hotspots' ? (
@@ -112,21 +111,17 @@ export function AdminDashboardPage({ dataState }: AdminDashboardPageProps) {
                 <EmptyState title="Chưa có hoạt động" description="Hoạt động hệ thống sẽ xuất hiện ở đây." />
               )
             ) : null}
-          </ContentPanel>
+          </div>
 
-          <CollapsibleSection title="Lối vào nhanh" count={model.quickLinks.length}>
-            <div className="compact-list">
+          {model.quickLinks.length ? (
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px', padding: '10px 0', borderTop: '1px solid var(--border)' }}>
               {model.quickLinks.map((item) => (
-                <div key={item.id} className="compact-list-item">
-                  <div>
-                    <strong style={{ fontSize: '13px' }}>{item.label}</strong>
-                    <div className="compact-list-meta">{item.detail}</div>
-                  </div>
-                  <a className="portal-outline-button" href={item.href}>Mở</a>
-                </div>
+                <a key={item.id} className="portal-outline-button" href={item.href}>
+                  {item.label}
+                </a>
               ))}
             </div>
-          </CollapsibleSection>
+          ) : null}
         </div>
       ) : null}
     </AdminPortalLayout>

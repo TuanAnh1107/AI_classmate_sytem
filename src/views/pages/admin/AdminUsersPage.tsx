@@ -10,7 +10,7 @@ import { AdminTableShell } from '../../components/admin/AdminTableShell'
 import { AdminTableSkeleton } from '../../components/admin/AdminTableSkeleton'
 import { EmptyState } from '../../components/shared/EmptyState'
 import { ErrorState } from '../../components/shared/ErrorState'
-import { MetricBar } from '../../components/shared/MetricBar'
+import { InfoHeader } from '../../components/shared/InfoHeader'
 import { RoleBadge } from '../../components/shared/RoleBadge'
 import { StatusBadge } from '../../components/shared/StatusBadge'
 import { AdminPortalLayout } from '../../layouts/AdminPortalLayout'
@@ -40,17 +40,18 @@ export function AdminUsersPage({ dataState }: AdminUsersPageProps) {
 
   return (
     <AdminPortalLayout frame={model.frame}>
-      <div className="page-title-bar">
-        <h1>Quản trị tài khoản</h1>
-        <div className="page-title-bar-actions">
-          <button className="portal-outline-button">Import</button>
-          <button className="portal-outline-button">Export</button>
-          <button className="portal-primary-button">Thêm người dùng</button>
-        </div>
-      </div>
-
-      <div className="student-page-body portal-page-transition">
-        <MetricBar items={model.stats} />
+      <div className="page-workspace">
+        <InfoHeader
+          title="Quản trị tài khoản"
+          stats={model.stats.map((s) => ({ label: s.label, value: s.value }))}
+          actions={
+            <>
+              <button className="portal-outline-button">Import</button>
+              <button className="portal-outline-button">Export</button>
+              <button className="portal-primary-button">Thêm người dùng</button>
+            </>
+          }
+        />
 
         <AdminFilterToolbar
           sticky

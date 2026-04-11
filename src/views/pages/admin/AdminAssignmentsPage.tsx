@@ -12,11 +12,11 @@ import { AdminDetailPanel } from '../../components/admin/AdminDetailPanel'
 import { AdminFilterToolbar } from '../../components/admin/AdminFilterToolbar'
 import { AdminPaginationBar } from '../../components/admin/AdminPaginationBar'
 import { AdminRowActions } from '../../components/admin/AdminRowActions'
-import { MetricBar } from '../../components/shared/MetricBar'
 import { AdminTableShell } from '../../components/admin/AdminTableShell'
 import { AdminTableSkeleton } from '../../components/admin/AdminTableSkeleton'
 import { EmptyState } from '../../components/shared/EmptyState'
 import { ErrorState } from '../../components/shared/ErrorState'
+import { InfoHeader } from '../../components/shared/InfoHeader'
 import { StatusBadge } from '../../components/shared/StatusBadge'
 import { AdminPortalLayout } from '../../layouts/AdminPortalLayout'
 
@@ -44,16 +44,17 @@ export function AdminAssignmentsPage({ dataState }: AdminAssignmentsPageProps) {
 
   return (
     <AdminPortalLayout frame={model.frame}>
-      <div className="page-title-bar">
-        <h1>Quản lý assignment</h1>
-        <div className="page-title-bar-actions">
-          <button className="portal-outline-button">Export</button>
-          <button className="portal-primary-button">Tạo assignment</button>
-        </div>
-      </div>
-
-      <div className="student-page-body portal-page-transition">
-        <MetricBar items={model.stats} />
+      <div className="page-workspace">
+        <InfoHeader
+          title="Quản lý assignment"
+          stats={model.stats.map((s) => ({ label: s.label, value: s.value }))}
+          actions={
+            <>
+              <button className="portal-outline-button">Export</button>
+              <button className="portal-primary-button">Tạo assignment</button>
+            </>
+          }
+        />
 
         <AdminFilterToolbar
           sticky

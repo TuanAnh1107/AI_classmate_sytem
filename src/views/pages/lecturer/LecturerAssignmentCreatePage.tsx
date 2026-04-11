@@ -1,10 +1,10 @@
 ﻿import type { DataState } from '../../../models/shared/portal.types'
 import { useLecturerAssignmentCreateController } from '../../../controllers/lecturer/useLecturerAssignmentCreateController'
+import { LecturerAssignmentWizard } from '../../components/lecturer/LecturerAssignmentWizard'
 import { EmptyState } from '../../components/shared/EmptyState'
 import { ErrorState } from '../../components/shared/ErrorState'
 import { LoadingState } from '../../components/shared/LoadingState'
 import { LecturerPortalLayout } from '../../layouts/LecturerPortalLayout'
-import { LecturerAssignmentWizard } from '../../components/lecturer/LecturerAssignmentWizard'
 
 type LecturerAssignmentCreatePageProps = {
   dataState: DataState
@@ -39,16 +39,16 @@ export function LecturerAssignmentCreatePage({ dataState }: LecturerAssignmentCr
 
   const initialDraft = {
     classId: model.classOptions[0]?.id ?? 'it4409',
-    title: 'Bài tập 03 - Thiết kế rubric đánh giá bằng AI',
-    description: 'Sinh viên thiết kế rubric đánh giá, mô tả tiêu chí và quy trình phản hồi cho lớp học.',
+    title: 'Bài tập mới',
+    description: 'Mô tả yêu cầu bài tập và tiêu chí đánh giá cho sinh viên.',
     dueAt: '2026-04-20T23:59',
     maxScore: 10,
     rubricTemplateId: model.rubricTemplates[0]?.id ?? '',
     allowLatePolicy: 'late-10',
-    submissionFormats: 'PDF, DOCX, Link Google Drive',
+    submissionFormats: 'PDF, DOCX, ZIP',
     maxFileSize: '20MB',
     resubmissionPolicy: 'once',
-    studentInstruction: 'Nộp bài đúng hạn và đính kèm minh chứng đầy đủ.',
+    studentInstruction: 'Sinh viên nộp bài đúng hạn và tải đầy đủ file minh chứng.',
     attachmentNote: '',
   }
 
@@ -59,9 +59,7 @@ export function LecturerAssignmentCreatePage({ dataState }: LecturerAssignmentCr
         classOptions={model.classOptions}
         rubricTemplates={model.rubricTemplates}
         questionDrafts={model.questions}
-        questionBank={model.questionBank}
         initialDraft={initialDraft}
-        initialSelectedQuestionIds={model.questionBank.map((item) => item.id)}
       />
     </LecturerPortalLayout>
   )

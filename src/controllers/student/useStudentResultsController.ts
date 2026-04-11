@@ -1,6 +1,12 @@
 import type { DataState } from '../../models/shared/portal.types'
 import type { FeedbackFilter, ResultRow, ResultSort, StudentPageFrame } from '../../models/student/student.types'
-import { studentAssignmentsMock, studentClassesMock, studentProfileMock, studentResultsMock } from '../../models/student/student.mock'
+import {
+  feedbackThreadsMock,
+  studentAssignmentsMock,
+  studentClassesMock,
+  studentProfileMock,
+  studentResultsMock,
+} from '../../models/student/student.mock'
 import {
   buildStudentPortalHref,
   formatPortalDate,
@@ -29,13 +35,20 @@ export interface StudentResultDetailViewModel {
   state: DataState
   frame: StudentPageFrame
   result?: {
+    id: string
+    assignmentId: string
     title: string
     classLabel: string
     totalScoreLabel: string
     updatedAtLabel: string
     lecturerFeedback: string
+    feedbackStatusLabel: string
+    feedbackStatusTone: ResultRow['feedbackTone']
     summary: string[]
     questionResults: typeof studentResultsMock[number]['questionResults']
+    feedbackMessages: typeof feedbackThreadsMock[number]['messages']
+    assignmentHref: string
+    feedbackHref: string
   }
   errorMessage?: string
 }
@@ -172,6 +185,8 @@ export function useStudentResultDetailController(
   const result = studentResultsMock.find((item) => item.id === resultId)
   const assignment = result ? studentAssignmentsMock.find((item) => item.id === result.assignmentId) : undefined
   const studentClass = result ? studentClassesMock.find((item) => item.id === result.classId) : undefined
+  const feedbackMeta = result ? getFeedbackStatusMeta(result.feedbackStatus) : undefined
+  const feedbackThread = result ? feedbackThreadsMock.find((item) => item.assignmentId === result.assignmentId) : undefined
 
   const frame: StudentPageFrame = {
     shell,
@@ -217,13 +232,22 @@ export function useStudentResultDetailController(
       state,
       frame,
       result: {
+        id: result.id,
+        assignmentId: result.assignmentId,
         title: assignment.title,
         classLabel: getClassLabel(studentClass),
         totalScoreLabel: `${result.totalScore.toFixed(1)}/${result.maxScore}`,
         updatedAtLabel: formatPortalDateTime(result.updatedAt),
         lecturerFeedback: result.lecturerFeedback,
+        feedbackStatusLabel: feedbackMeta?.label ?? 'Đã xem',
+        feedbackStatusTone: feedbackMeta?.tone ?? 'neutral',
         summary: [],
         questionResults: [],
+        feedbackMessages: feedbackThread?.messages ?? [],
+        assignmentHref: buildStudentPortalHref('assignment-detail', { assignmentId: assignment.id }),
+        feedbackHref: buildStudentPortalHref('feedback', {
+          threadId: feedbackThread?.id,
+        }),
       },
     }
   }
@@ -232,13 +256,22 @@ export function useStudentResultDetailController(
     state,
     frame,
     result: {
+      id: result.id,
+      assignmentId: result.assignmentId,
       title: assignment.title,
       classLabel: getClassLabel(studentClass),
       totalScoreLabel: `${result.totalScore.toFixed(1)}/${result.maxScore}`,
       updatedAtLabel: formatPortalDateTime(result.updatedAt),
       lecturerFeedback: result.lecturerFeedback,
+      feedbackStatusLabel: feedbackMeta?.label ?? 'Đã xem',
+      feedbackStatusTone: feedbackMeta?.tone ?? 'neutral',
       summary: result.summary,
       questionResults: result.questionResults,
+      feedbackMessages: feedbackThread?.messages ?? [],
+      assignmentHref: buildStudentPortalHref('assignment-detail', { assignmentId: assignment.id }),
+      feedbackHref: buildStudentPortalHref('feedback', {
+        threadId: feedbackThread?.id,
+      }),
     },
   }
 }

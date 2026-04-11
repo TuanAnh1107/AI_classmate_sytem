@@ -1,4 +1,4 @@
-import type { DataState, StatusTone } from '../../models/shared/portal.types'
+﻿import type { DataState, StatusTone } from '../../models/shared/portal.types'
 import type { LecturerPageFrame } from '../../models/lecturer/lecturer.types'
 import { assignmentsMock, submissionsMock } from '../../models/assignment/assignment.mock'
 import { lecturerProfileMock } from '../../models/lecturer/lecturer.mock'
@@ -43,11 +43,11 @@ export function useLecturerAssignmentDetailController(
   const frame: LecturerPageFrame = {
     shell,
     pageTitle: assignment ? assignment.title : 'Chi tiết bài tập',
-    pageDescription: 'Theo dõi đề bài và trạng thái nộp của từng sinh viên trong cùng một màn hình.',
+    pageDescription: 'Theo dõi danh sách đã nộp và chưa nộp trong cùng một màn hình.',
     breadcrumbs: [
       { label: 'Trang chủ', href: buildLecturerPortalHref('dashboard') },
       { label: 'Bài tập', href: buildLecturerPortalHref('assignments') },
-      { label: assignment?.title ?? 'Chi tiết' },
+      { label: assignment?.title ?? 'Chi tiết bài tập' },
     ],
   }
 

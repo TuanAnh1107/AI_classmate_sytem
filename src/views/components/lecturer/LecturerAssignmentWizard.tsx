@@ -1,21 +1,19 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
-import { validateAssignmentDraft } from '../../../utils/assignmentValidators'
 import type { AssignmentQuestionDraft, LecturerClassOption, RubricTemplate } from '../../../models/lecturer/lecturer.types'
+import { formatPortalDateTime } from '../../../models/student/student.mappers'
+import { validateAssignmentDraft } from '../../../utils/assignmentValidators'
 import { AssignmentReviewSummary } from './AssignmentReviewSummary'
-import { QuestionBankPicker, type QuestionBankFilters } from './QuestionBankPicker'
-import type { QuestionBankItem } from './QuestionCompactCard'
 import { LecturerStepper } from './LecturerStepper'
-import { DisclosureSection } from '../shared/DisclosureSection'
-import { FormField } from '../shared/FormField'
-import { FormRow } from '../shared/FormRow'
-import { SelectInput } from '../shared/SelectInput'
-import { TextArea } from '../shared/TextArea'
-import { TextInput } from '../shared/TextInput'
+import { ConfirmDialog } from '../shared/ConfirmDialog'
 import { DateTimeInput } from '../shared/DateTimeInput'
 import { FileUploadField } from '../shared/FileUploadField'
+import { FormField } from '../shared/FormField'
+import { FormRow } from '../shared/FormRow'
+import { InfoHeader } from '../shared/InfoHeader'
+import { SelectInput } from '../shared/SelectInput'
 import { StatusBadge } from '../shared/StatusBadge'
-import { ConfirmDialog } from '../shared/ConfirmDialog'
-import { formatPortalDateTime } from '../../../models/student/student.mappers'
+import { TextArea } from '../shared/TextArea'
+import { TextInput } from '../shared/TextInput'
 
 export type AssignmentWizardDraft = {
   classId: string
@@ -37,9 +35,7 @@ type AssignmentWizardProps = {
   classOptions: LecturerClassOption[]
   rubricTemplates: RubricTemplate[]
   questionDrafts: AssignmentQuestionDraft[]
-  questionBank: QuestionBankItem[]
   initialDraft: AssignmentWizardDraft
-  initialSelectedQuestionIds: string[]
 }
 
 type StepId = 'general' | 'submission' | 'questions' | 'review'
@@ -49,25 +45,17 @@ export function LecturerAssignmentWizard({
   classOptions,
   rubricTemplates,
   questionDrafts,
-  questionBank,
   initialDraft,
-  initialSelectedQuestionIds,
 }: AssignmentWizardProps) {
   const [step, setStep] = useState<StepId>('general')
   const [draft, setDraft] = useState<AssignmentWizardDraft>(initialDraft)
-  const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>(initialSelectedQuestionIds)
+  const [manualQuestionText, setManualQuestionText] = useState(questionDrafts.map((item) => item.prompt).join('\n\n'))
+  const [questionFileLabel, setQuestionFileLabel] = useState('')
+  const [rubricFileLabel, setRubricFileLabel] = useState('')
   const [validationMessage, setValidationMessage] = useState<string | undefined>()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
-  const [rubricFileLabel, setRubricFileLabel] = useState('')
-
-  const [questionFilters, setQuestionFilters] = useState<QuestionBankFilters>({
-    search: '',
-    typeGrade: 'all',
-    owner: 'all',
-    scoreRange: 'all',
-  })
 
   useEffect(() => {
     if (!dirty) return
@@ -76,7 +64,7 @@ export function LecturerAssignmentWizard({
       setDirty(false)
     }, 900)
     return () => window.clearTimeout(timer)
-  }, [dirty, draft, rubricFileLabel, selectedQuestionIds])
+  }, [dirty, draft, manualQuestionText, questionFileLabel, rubricFileLabel])
 
   useEffect(() => {
     const handler = (event: BeforeUnloadEvent) => {
@@ -88,66 +76,32 @@ export function LecturerAssignmentWizard({
     return () => window.removeEventListener('beforeunload', handler)
   }, [dirty])
 
-  const totalQuestionScore = useMemo(() => {
-    return questionBank
-      .filter((item) => selectedQuestionIds.includes(item.id))
-      .reduce((sum, item) => sum + item.maxScore, 0)
-  }, [questionBank, selectedQuestionIds])
-
-  const selectedWarnings = useMemo(() => {
-    const warnings = [] as { id: string; label: string; tone: 'info' | 'warning' | 'danger' }[]
-    if (selectedQuestionIds.length === 0) {
-      warnings.push({ id: 'no-questions', label: 'Chưa chọn câu hỏi', tone: 'warning' })
+  const selectedClass = classOptions.find((item) => item.id === draft.classId) ?? classOptions[0]
+  const warningItems = useMemo(() => {
+    const warnings: { id: string; label: string; detail: string; tone: 'info' | 'warning' | 'danger' }[] = []
+    if (!draft.title.trim()) {
+      warnings.push({ id: 'title', label: 'Thiếu tiêu đề', detail: 'Cần nhập tiêu đề bài tập.', tone: 'warning' })
+    }
+    if (!manualQuestionText.trim() && !questionFileLabel) {
+      warnings.push({ id: 'questions', label: 'Thiếu câu hỏi', detail: 'Cần nhập câu hỏi hoặc tải tệp câu hỏi lên.', tone: 'warning' })
     }
     if (!rubricFileLabel) {
-      warnings.push({ id: 'no-rubric-file', label: 'Chưa đính kèm tệp rubric bắt buộc', tone: 'warning' })
-    }
-    if (totalQuestionScore !== draft.maxScore) {
-      warnings.push({
-        id: 'score-mismatch',
-        label: 'Tổng điểm câu hỏi chưa khớp điểm bài',
-        tone: 'danger',
-      })
+      warnings.push({ id: 'rubric', label: 'Thiếu rubric', detail: 'Rubric file là bắt buộc trước khi phát hành.', tone: 'danger' })
     }
     return warnings
-  }, [selectedQuestionIds.length, rubricFileLabel, totalQuestionScore, draft.maxScore])
-
-  const filteredQuestionBank = useMemo(() => {
-    return questionBank
-      .filter((item) => item.title.toLowerCase().includes(questionFilters.search.toLowerCase()))
-      .filter((item) => (questionFilters.typeGrade === 'all' ? true : item.typeGrade === questionFilters.typeGrade))
-      .filter((item) => (questionFilters.owner === 'all' ? true : item.ownerLabel === questionFilters.owner))
-      .filter((item) => {
-        if (questionFilters.scoreRange === 'all') return true
-        if (questionFilters.scoreRange === 'low') return item.maxScore <= 5
-        if (questionFilters.scoreRange === 'mid') return item.maxScore > 5 && item.maxScore <= 8
-        return item.maxScore > 8
-      })
-  }, [questionBank, questionFilters])
-
-  const classOption = classOptions.find((item) => item.id === draft.classId) ?? classOptions[0]
-  const rubricOption = rubricTemplates.find((item) => item.id === draft.rubricTemplateId)
-
-  const reviewWarnings = selectedWarnings.map((warning) => ({
-    id: warning.id,
-    label: warning.label,
-    detail: warning.label,
-    tone: warning.tone,
-  }))
+  }, [draft.title, manualQuestionText, questionFileLabel, rubricFileLabel])
 
   const steps = [
     { id: 'general', label: 'Thông tin chung' },
-    { id: 'submission', label: 'Yêu cầu nộp bài' },
-    { id: 'questions', label: 'Cấu trúc câu hỏi' },
-    { id: 'review', label: 'Rà soát & phát hành' },
-  ]
+    { id: 'submission', label: 'Chính sách nộp bài' },
+    { id: 'questions', label: 'Câu hỏi và rubric' },
+    { id: 'review', label: 'Rà soát và phát hành' },
+  ] as const
 
-  const stepButtons = steps.map((item) => ({
-    id: item.id,
-    label: item.label,
-    isActive: step === item.id,
-    onClick: () => setStep(item.id as StepId),
-  }))
+  const handleFieldChange = <K extends keyof AssignmentWizardDraft>(key: K, value: AssignmentWizardDraft[K]) => {
+    setDraft((prev) => ({ ...prev, [key]: value }))
+    setDirty(true)
+  }
 
   const handlePublish = () => {
     const validation = validateAssignmentDraft({
@@ -157,45 +111,44 @@ export function LecturerAssignmentWizard({
       maxScore: draft.maxScore,
     })
 
-    if (!selectedQuestionIds.length) {
-      setValidationMessage('Vui lòng chọn ít nhất một câu hỏi cho bài tập.')
-      return
-    }
-    if (!rubricFileLabel) {
-      setValidationMessage('Cần đính kèm tệp rubric trước khi phát hành bài tập.')
-      return
-    }
-    if (totalQuestionScore !== draft.maxScore) {
-      setValidationMessage('Tổng điểm câu hỏi chưa khớp tổng điểm bài tập.')
+    if (!manualQuestionText.trim() && !questionFileLabel) {
+      setValidationMessage('Cần nhập câu hỏi hoặc tải file câu hỏi trước khi phát hành.')
       return
     }
 
-    setValidationMessage(validation.isValid ? undefined : validation.message)
-    if (validation.isValid) {
-      setConfirmOpen(true)
+    if (!rubricFileLabel) {
+      setValidationMessage('Cần tải file rubric trước khi phát hành bài tập.')
+      return
     }
+
+    if (!validation.isValid) {
+      setValidationMessage(validation.message)
+      return
+    }
+
+    setValidationMessage(undefined)
+    setConfirmOpen(true)
   }
 
-  const advanceTo = (nextStep: StepId) => () => setStep(nextStep)
-
   return (
-    <div className="lecturer-assignment-wizard">
-      <div className="lecturer-wizard-head">
-        <div>
-          <h2>{mode === 'create' ? 'Tạo bài tập mới' : 'Chỉnh sửa bài tập'}</h2>
-          <p>
-            {mode === 'create'
-              ? 'Đi từng bước: thông tin chung, chính sách nộp, cấu trúc câu hỏi, rồi rà soát trước khi phát hành.'
-              : 'Cập nhật bài tập theo từng nhóm thông tin để giảm lỗi và dễ kiểm soát thay đổi.'}
-          </p>
-        </div>
-        <div className="lecturer-wizard-meta">
-          {lastSavedAt ? <span>Lưu nháp lúc {formatPortalDateTime(lastSavedAt.toISOString())}</span> : <span>Chưa lưu nháp</span>}
-          {dirty ? <StatusBadge label="Chưa lưu" tone="warning" /> : <StatusBadge label="Đã lưu" tone="success" />}
-        </div>
-      </div>
+    <div className="page-workspace">
+      <InfoHeader
+        title={mode === 'create' ? 'Tạo bài tập mới' : 'Chỉnh sửa bài tập'}
+        subtitle={
+          mode === 'create'
+            ? 'Thiết lập đề bài, cách nộp bài và rubric theo đúng lớp phụ trách.'
+            : 'Cập nhật nội dung bài tập và giữ nguyên luồng chấm bài hiện có.'
+        }
+        badges={[{ label: dirty ? 'Chưa lưu' : 'Đã lưu nháp', tone: dirty ? 'warning' : 'success' }]}
+        stats={lastSavedAt ? [{ label: 'Lưu nháp lúc', value: formatPortalDateTime(lastSavedAt.toISOString()) }] : []}
+        actions={
+          <a className="portal-outline-button" href="?portal=lecturer&page=assignments">
+            Quay lại danh sách
+          </a>
+        }
+      />
 
-      <LecturerStepper steps={stepButtons} />
+      <LecturerStepper steps={steps.map((item) => ({ ...item, isActive: item.id === step, onClick: () => setStep(item.id) }))} />
 
       {validationMessage ? <div className="portal-inline-error">{validationMessage}</div> : null}
 
@@ -203,111 +156,51 @@ export function LecturerAssignmentWizard({
         <section className="portal-section-card">
           <header className="portal-section-head">
             <div>
-              <p className="portal-section-kicker">Thiết lập chung</p>
-              <h2>Thông tin bài tập</h2>
+              <p className="portal-section-kicker">Bước 1</p>
+              <h2>Thông tin chung</h2>
             </div>
             <div className="portal-button-row">
-              <button type="button" className="portal-outline-button" onClick={advanceTo('submission')}>
+              <button type="button" className="portal-outline-button" onClick={() => setStep('submission')}>
                 Tiếp theo
               </button>
             </div>
           </header>
 
-          <DisclosureSection
-            title="Thông tin bắt buộc"
-            kicker="Primary fields"
-            description="Chỉ giữ những trường thật sự cần để bài tập có thể được nhận diện và lên lịch."
-            defaultOpen
-            summary={<StatusBadge label={classOption ? classOption.code : 'Chưa chọn lớp'} tone="info" />}
-          >
-            <div className="portal-form-stack">
-              <FormRow>
-                <FormField label="Lớp học" required helper="Chọn lớp sẽ nhận bài tập này.">
-                  <SelectInput
-                    value={draft.classId}
-                    options={classOptions.map((item) => ({ value: item.id, label: `${item.code} · ${item.name}` }))}
-                    onChange={(value) => {
-                      setDraft((prev) => ({ ...prev, classId: value }))
-                      setDirty(true)
-                    }}
-                  />
-                </FormField>
-                <FormField label="Hạn nộp" required helper="Thời gian đóng bài của sinh viên.">
-                  <DateTimeInput
-                    value={draft.dueAt}
-                    onChange={(value) => {
-                      setDraft((prev) => ({ ...prev, dueAt: value }))
-                      setDirty(true)
-                    }}
-                  />
-                </FormField>
-              </FormRow>
-
-              <FormField label="Tiêu đề bài tập" required helper="Ngắn gọn, phản ánh đúng mục tiêu học phần.">
-                <TextInput
-                  value={draft.title}
-                  onChange={(value) => {
-                    setDraft((prev) => ({ ...prev, title: value }))
-                    setDirty(true)
-                  }}
+          <div className="portal-form-stack">
+            <FormRow>
+              <FormField label="Lớp học" required helper="Chọn lớp sẽ nhận bài tập này.">
+                <SelectInput
+                  value={draft.classId}
+                  options={classOptions.map((item) => ({ value: item.id, label: `${item.code} · ${item.name}` }))}
+                  onChange={(value) => handleFieldChange('classId', value)}
                 />
               </FormField>
-
-              <FormField label="Mô tả bài tập" required>
-                <TextArea
-                  value={draft.description}
-                  onChange={(value) => {
-                    setDraft((prev) => ({ ...prev, description: value }))
-                    setDirty(true)
-                  }}
-                />
+              <FormField label="Hạn nộp" required helper="Sinh viên chỉ có thể nộp bài trước mốc này trừ khi bạn bật nộp trễ.">
+                <DateTimeInput value={draft.dueAt} onChange={(value) => handleFieldChange('dueAt', value)} />
               </FormField>
-            </div>
-          </DisclosureSection>
+            </FormRow>
 
-          <DisclosureSection
-            title="Thiết lập đánh giá"
-            kicker="Assessment setup"
-            description="Ẩn phần cấu hình sâu để bước đầu tiên không biến thành một form dài và nặng."
-            summary={<StatusBadge label={`${draft.maxScore} điểm`} tone="info" />}
-          >
+            <FormField label="Tiêu đề bài tập" required>
+              <TextInput value={draft.title} onChange={(value) => handleFieldChange('title', value)} />
+            </FormField>
+
+            <FormField label="Mô tả bài tập" required>
+              <TextArea value={draft.description} onChange={(value) => handleFieldChange('description', value)} />
+            </FormField>
+
             <FormRow>
               <FormField label="Điểm tối đa" required>
-                <TextInput
-                  type="number"
-                  value={String(draft.maxScore)}
-                  onChange={(value) => {
-                    setDraft((prev) => ({ ...prev, maxScore: Number(value) || 0 }))
-                    setDirty(true)
-                  }}
-                />
+                <TextInput type="number" value={String(draft.maxScore)} onChange={(value) => handleFieldChange('maxScore', Number(value) || 0)} />
               </FormField>
-              <FormField label="Rubric mẫu" helper="Gợi ý tiêu chí chấm cho toàn bộ bài.">
+              <FormField label="Rubric mẫu tham chiếu">
                 <SelectInput
                   value={draft.rubricTemplateId}
                   options={rubricTemplates.map((item) => ({ value: item.id, label: item.label }))}
-                  onChange={(value) => {
-                    setDraft((prev) => ({ ...prev, rubricTemplateId: value }))
-                    setDirty(true)
-                  }}
-                />
-              </FormField>
-              <FormField label="Chính sách trễ hạn" helper="Thiết lập quy định nộp trễ.">
-                <SelectInput
-                  value={draft.allowLatePolicy}
-                  options={[
-                    { value: 'late-10', label: 'Nộp trễ tối đa 2 ngày · trừ 10%' },
-                    { value: 'late-20', label: 'Nộp trễ tối đa 1 ngày · trừ 20%' },
-                    { value: 'no-late', label: 'Không nhận bài trễ hạn' },
-                  ]}
-                  onChange={(value) => {
-                    setDraft((prev) => ({ ...prev, allowLatePolicy: value }))
-                    setDirty(true)
-                  }}
+                  onChange={(value) => handleFieldChange('rubricTemplateId', value)}
                 />
               </FormField>
             </FormRow>
-          </DisclosureSection>
+          </div>
         </section>
       ) : null}
 
@@ -315,93 +208,58 @@ export function LecturerAssignmentWizard({
         <section className="portal-section-card">
           <header className="portal-section-head">
             <div>
-              <p className="portal-section-kicker">Submission policy</p>
-              <h2>Yêu cầu nộp bài</h2>
+              <p className="portal-section-kicker">Bước 2</p>
+              <h2>Chính sách nộp bài</h2>
             </div>
             <div className="portal-button-row">
-              <button type="button" className="portal-outline-button" onClick={advanceTo('general')}>
+              <button type="button" className="portal-outline-button" onClick={() => setStep('general')}>
                 Quay lại
               </button>
-              <button type="button" className="portal-outline-button" onClick={advanceTo('questions')}>
+              <button type="button" className="portal-outline-button" onClick={() => setStep('questions')}>
                 Tiếp theo
               </button>
             </div>
           </header>
 
-          <DisclosureSection
-            title="Quy định nộp bài chính"
-            kicker="Core policy"
-            description="Mở sẵn để giảng viên hoàn tất các luật nộp bài quan trọng trước."
-            defaultOpen
-            summary={<StatusBadge label={draft.resubmissionPolicy === 'none' ? 'Không cho nộp lại' : 'Có cho nộp lại'} tone="info" />}
-          >
+          <div className="portal-form-stack">
             <FormRow>
               <FormField label="Định dạng chấp nhận">
-                <TextInput
-                  value={draft.submissionFormats}
-                  onChange={(value) => {
-                    setDraft((prev) => ({ ...prev, submissionFormats: value }))
-                    setDirty(true)
-                  }}
-                />
+                <TextInput value={draft.submissionFormats} onChange={(value) => handleFieldChange('submissionFormats', value)} />
               </FormField>
               <FormField label="Dung lượng tối đa">
-                <TextInput
-                  value={draft.maxFileSize}
-                  onChange={(value) => {
-                    setDraft((prev) => ({ ...prev, maxFileSize: value }))
-                    setDirty(true)
-                  }}
+                <TextInput value={draft.maxFileSize} onChange={(value) => handleFieldChange('maxFileSize', value)} />
+              </FormField>
+            </FormRow>
+
+            <FormRow>
+              <FormField label="Nộp trễ">
+                <SelectInput
+                  value={draft.allowLatePolicy}
+                  options={[
+                    { value: 'late-10', label: 'Cho phép nộp trễ, trừ 10%' },
+                    { value: 'late-20', label: 'Cho phép nộp trễ, trừ 20%' },
+                    { value: 'no-late', label: 'Không cho phép nộp trễ' },
+                  ]}
+                  onChange={(value) => handleFieldChange('allowLatePolicy', value)}
+                />
+              </FormField>
+              <FormField label="Nộp lại">
+                <SelectInput
+                  value={draft.resubmissionPolicy}
+                  options={[
+                    { value: 'once', label: 'Cho phép nộp lại 1 lần' },
+                    { value: 'twice', label: 'Cho phép nộp lại 2 lần' },
+                    { value: 'none', label: 'Không cho phép nộp lại' },
+                  ]}
+                  onChange={(value) => handleFieldChange('resubmissionPolicy', value)}
                 />
               </FormField>
             </FormRow>
 
-            <FormField label="Chính sách nộp lại">
-              <SelectInput
-                value={draft.resubmissionPolicy}
-                options={[
-                  { value: 'once', label: 'Cho phép nộp lại 1 lần' },
-                  { value: 'twice', label: 'Cho phép nộp lại 2 lần' },
-                  { value: 'none', label: 'Không cho phép nộp lại' },
-                ]}
-                onChange={(value) => {
-                  setDraft((prev) => ({ ...prev, resubmissionPolicy: value }))
-                  setDirty(true)
-                }}
-              />
+            <FormField label="Hướng dẫn cho sinh viên">
+              <TextArea value={draft.studentInstruction} onChange={(value) => handleFieldChange('studentInstruction', value)} />
             </FormField>
-          </DisclosureSection>
-
-          <DisclosureSection
-            title="Hướng dẫn và rubric file"
-            kicker="Guidance"
-            description="Ẩn mặc định để phần chính sách không bị trôi xuống quá sâu. Rubric file là bắt buộc trong luồng này."
-            summary={<StatusBadge label={rubricFileLabel ? 'Đã có tệp rubric' : 'Thiếu tệp rubric'} tone={rubricFileLabel ? 'success' : 'warning'} />}
-          >
-            <div className="portal-form-stack">
-              <FormField label="Hướng dẫn cho sinh viên">
-                <TextArea
-                  value={draft.studentInstruction}
-                  onChange={(value) => {
-                    setDraft((prev) => ({ ...prev, studentInstruction: value }))
-                    setDirty(true)
-                  }}
-                />
-              </FormField>
-
-              <FileUploadField
-                label="Tệp rubric"
-                helper="Bắt buộc đính kèm rubric hoặc tài liệu hướng dẫn chấm cho bài tập này."
-                required
-                valueLabel={rubricFileLabel || 'Chưa chọn tệp rubric'}
-                buttonLabel={rubricFileLabel ? 'Đổi tệp' : 'Chọn tệp'}
-                onClick={() => {
-                  setRubricFileLabel(rubricFileLabel || 'rubric-huong-dan.pdf')
-                  setDirty(true)
-                }}
-              />
-            </div>
-          </DisclosureSection>
+          </div>
         </section>
       ) : null}
 
@@ -409,92 +267,69 @@ export function LecturerAssignmentWizard({
         <section className="portal-section-card">
           <header className="portal-section-head">
             <div>
-              <p className="portal-section-kicker">Cấu trúc câu hỏi</p>
-              <h2>Thiết kế câu hỏi</h2>
+              <p className="portal-section-kicker">Bước 3</p>
+              <h2>Câu hỏi và rubric</h2>
             </div>
             <div className="portal-button-row">
-              <button type="button" className="portal-outline-button" onClick={advanceTo('submission')}>
+              <button type="button" className="portal-outline-button" onClick={() => setStep('submission')}>
                 Quay lại
               </button>
-              <button type="button" className="portal-outline-button" onClick={advanceTo('review')}>
+              <button type="button" className="portal-outline-button" onClick={() => setStep('review')}>
                 Tiếp theo
               </button>
             </div>
           </header>
 
-          <DisclosureSection
-            title="Câu hỏi tự soạn"
-            kicker="Manual questions"
-            description="Mỗi câu hỏi được đóng theo từng nhóm để bước này không biến thành một cột form rất dài."
-            defaultOpen
-            summary={<StatusBadge label={`${questionDrafts.length} câu`} tone="info" />}
-          >
-            <div className="portal-form-stack">
-              {questionDrafts.map((question) => (
-                <DisclosureSection
-                  key={question.id}
-                  title={`Câu ${question.order}`}
-                  kicker="Question editor"
-                  description="Mở khi cần sửa prompt hoặc điểm số của câu này."
-                  className="question-editor-disclosure"
-                  summary={<StatusBadge label={`${question.maxScore} điểm`} tone="info" />}
-                  defaultOpen={question.order === 1}
-                >
-                  <div className="portal-form-stack">
-                    <FormField label="Đề bài" required>
-                      <TextArea defaultValue={question.prompt} />
-                    </FormField>
+          <div className="portal-form-stack">
+            <FormField label="Nhập nội dung câu hỏi" helper="Giảng viên có thể nhập trực tiếp đề bài tại đây.">
+              <TextArea
+                value={manualQuestionText}
+                onChange={(value) => {
+                  setManualQuestionText(value)
+                  setDirty(true)
+                }}
+                placeholder="Ví dụ: Câu 1... Câu 2..."
+              />
+            </FormField>
 
-                    <FormRow>
-                      <FormField label="Điểm tối đa" required>
-                        <TextInput type="number" defaultValue={String(question.maxScore)} />
-                      </FormField>
-                      <FormField label="Gợi ý rubric">
-                        <TextInput defaultValue={question.rubricNote} />
-                      </FormField>
-                    </FormRow>
-                  </div>
-                </DisclosureSection>
-              ))}
-            </div>
-          </DisclosureSection>
-
-          <DisclosureSection
-            title="Chọn câu từ ngân hàng"
-            kicker="Question bank"
-            description="Ngân hàng câu hỏi được giữ gọn: summary chọn câu hiện ra trước, bộ lọc sâu và preview nằm sau disclosure riêng."
-            defaultOpen
-            summary={<StatusBadge label={`${selectedQuestionIds.length} câu đã chọn`} tone="success" />}
-          >
-            <QuestionBankPicker
-              items={filteredQuestionBank}
-              selectedIds={selectedQuestionIds}
-              filters={questionFilters}
-              typeOptions={[
-                { value: 'all', label: 'Tất cả' },
-                { value: 'rubric', label: 'Rubric' },
-                { value: 'auto', label: 'Tự động' },
-                { value: 'manual', label: 'Thủ công' },
-              ]}
-              ownerOptions={['all', ...Array.from(new Set(questionBank.map((item) => item.ownerLabel)))].map((value) => ({
-                value,
-                label: value === 'all' ? 'Tất cả' : value,
-              }))}
-              scoreOptions={[
-                { value: 'all', label: 'Tất cả' },
-                { value: 'low', label: '<= 5 điểm' },
-                { value: 'mid', label: '6 - 8 điểm' },
-                { value: 'high', label: '>= 9 điểm' },
-              ]}
-              onFiltersChange={(next) => setQuestionFilters((prev) => ({ ...prev, ...next }))}
-              onToggle={(id) => {
-                setSelectedQuestionIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]))
+            <FileUploadField
+              label="Tệp câu hỏi"
+              helper="Hoặc tải file câu hỏi lên thay cho việc nhập trực tiếp."
+              valueLabel={questionFileLabel || 'Chưa chọn file câu hỏi'}
+              buttonLabel={questionFileLabel ? 'Đổi file' : 'Tải file câu hỏi'}
+              onClick={() => {
+                setQuestionFileLabel(questionFileLabel || 'de-bai-assignment.pdf')
                 setDirty(true)
               }}
-              totalScore={totalQuestionScore}
-              warnings={selectedWarnings}
             />
-          </DisclosureSection>
+
+            <FileUploadField
+              label="Tệp rubric"
+              helper="Bắt buộc phải có file rubric trước khi phát hành bài tập."
+              required
+              valueLabel={rubricFileLabel || 'Chưa chọn file rubric'}
+              buttonLabel={rubricFileLabel ? 'Đổi file' : 'Tải file rubric'}
+              onClick={() => {
+                setRubricFileLabel(rubricFileLabel || 'rubric-assignment.pdf')
+                setDirty(true)
+              }}
+            />
+
+            <div className="portal-summary-inline">
+              <article className="portal-summary-chip">
+                <span>Nội dung câu hỏi</span>
+                <strong>{manualQuestionText.trim() ? 'Đã nhập' : 'Chưa nhập'}</strong>
+              </article>
+              <article className="portal-summary-chip">
+                <span>Tệp câu hỏi</span>
+                <strong>{questionFileLabel ? 'Đã tải' : 'Chưa có'}</strong>
+              </article>
+              <article className="portal-summary-chip">
+                <span>Tệp rubric</span>
+                <strong>{rubricFileLabel ? 'Đã tải' : 'Bắt buộc'}</strong>
+              </article>
+            </div>
+          </div>
         </section>
       ) : null}
 
@@ -502,15 +337,12 @@ export function LecturerAssignmentWizard({
         <section className="portal-section-card">
           <header className="portal-section-head">
             <div>
-              <p className="portal-section-kicker">Review & publish</p>
-              <h2>Rà soát trước khi phát hành</h2>
+              <p className="portal-section-kicker">Bước 4</p>
+              <h2>Rà soát và phát hành</h2>
             </div>
             <div className="portal-button-row">
-              <button type="button" className="portal-outline-button" onClick={advanceTo('questions')}>
+              <button type="button" className="portal-outline-button" onClick={() => setStep('questions')}>
                 Quay lại
-              </button>
-              <button type="button" className="portal-outline-button">
-                Xem preview
               </button>
               <button type="button" className="portal-primary-button" onClick={handlePublish}>
                 {mode === 'create' ? 'Phát hành' : 'Cập nhật'}
@@ -518,16 +350,22 @@ export function LecturerAssignmentWizard({
             </div>
           </header>
 
+          <div className="portal-button-row" style={{ marginBottom: 16 }}>
+            {warningItems.map((item) => (
+              <StatusBadge key={item.id} label={item.label} tone={item.tone} />
+            ))}
+          </div>
+
           <AssignmentReviewSummary
             title={draft.title}
-            classLabel={classOption ? `${classOption.code} · ${classOption.name}` : ''}
-            dueAtLabel={formatPortalDateTime(draft.dueAt)}
-            totalQuestions={selectedQuestionIds.length}
-            totalScore={totalQuestionScore}
-            allowLateLabel={draft.allowLatePolicy === 'no-late' ? 'Không nhận bài trễ hạn' : 'Cho phép nộp trễ có điều kiện'}
-            submissionFormats={draft.submissionFormats}
-            rubricTemplateLabel={rubricOption?.label}
-            warnings={reviewWarnings}
+            classLabel={selectedClass ? `${selectedClass.code} · ${selectedClass.name}` : 'Chưa chọn lớp'}
+            dueAtLabel={draft.dueAt ? formatPortalDateTime(draft.dueAt) : 'Chưa có hạn nộp'}
+            totalQuestions={manualQuestionText.trim() ? manualQuestionText.split('\n').filter(Boolean).length : 0}
+            totalScore={draft.maxScore}
+            allowLateLabel={draft.allowLatePolicy === 'no-late' ? 'Không cho phép nộp trễ' : 'Cho phép nộp trễ có điều kiện'}
+            submissionFormats={draft.submissionFormats || 'Chưa cấu hình'}
+            rubricTemplateLabel={rubricFileLabel || 'Chưa tải file rubric'}
+            warnings={warningItems}
           />
         </section>
       ) : null}
@@ -537,8 +375,8 @@ export function LecturerAssignmentWizard({
         title={mode === 'create' ? 'Phát hành bài tập' : 'Cập nhật bài tập'}
         description={
           mode === 'create'
-            ? 'Bài tập sẽ được gửi tới sinh viên trong lớp. Bạn có chắc chắn muốn phát hành?'
-            : 'Nội dung sẽ được cập nhật và gửi thông báo cho sinh viên.'
+            ? 'Bài tập sẽ được gửi tới lớp đã chọn. Xác nhận để phát hành.'
+            : 'Thay đổi sẽ được cập nhật cho bài tập hiện tại. Xác nhận để tiếp tục.'
         }
         onCancel={() => setConfirmOpen(false)}
         onConfirm={() => setConfirmOpen(false)}
@@ -546,5 +384,3 @@ export function LecturerAssignmentWizard({
     </div>
   )
 }
-
-

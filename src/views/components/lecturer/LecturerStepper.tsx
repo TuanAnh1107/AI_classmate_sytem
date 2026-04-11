@@ -1,4 +1,4 @@
-type Step = {
+﻿type Step = {
   id: string
   label: string
   isActive?: boolean
@@ -11,10 +11,9 @@ type LecturerStepperProps = {
 
 export function LecturerStepper({ steps }: LecturerStepperProps) {
   return (
-    <div className="lecturer-stepper">
-      {steps.map((step, index) => (
-        <button key={step.id} type="button" className={step.isActive ? 'is-active' : undefined} onClick={step.onClick}>
-          <span>{index + 1}</span>
+    <div className="wizard-stepper">
+      {steps.map((step) => (
+        <button key={step.id} type="button" className={`wizard-step-btn${step.isActive ? ' is-active' : ''}`} onClick={step.onClick}>
           {step.label}
         </button>
       ))}

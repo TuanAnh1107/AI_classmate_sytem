@@ -22,7 +22,6 @@ type NotificationInboxShellProps = {
   errorMessage?: string
   stats: InboxStat[]
   rows: NotificationRow[]
-  selectedId?: string
   searchValue: string
   onSearchChange: (value: string) => void
   filterValue: InboxFilter
@@ -45,7 +44,6 @@ export function NotificationInboxShell({
   errorMessage,
   stats,
   rows,
-  selectedId,
   searchValue,
   onSearchChange,
   filterValue,
@@ -65,7 +63,7 @@ export function NotificationInboxShell({
   )
 
   return (
-    <section className="portal-section-card portal-inbox-shell portal-page-transition">
+    <section className="portal-section-card portal-page-transition">
       <header className="portal-section-head">
         <div>
           {kicker ? <p className="portal-section-kicker">{kicker}</p> : null}
@@ -105,7 +103,7 @@ export function NotificationInboxShell({
       {state === 'loading' ? <LoadingState title={loadingTitle} description={loadingDescription} /> : null}
       {state === 'error' ? <ErrorState description={errorMessage ?? 'Không thể tải thông báo.'} /> : null}
       {state === 'empty' ? <EmptyState title={emptyTitle} description={emptyDescription} /> : null}
-      {state === 'ready' ? <NotificationList rows={rows} selectedId={selectedId} /> : null}
+      {state === 'ready' ? <NotificationList rows={rows} /> : null}
     </section>
   )
 }

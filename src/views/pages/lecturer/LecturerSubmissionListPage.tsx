@@ -1,16 +1,15 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { DataState } from '../../../models/shared/portal.types'
 import { lecturerSubmissionSortOptions, useLecturerSubmissionListController } from '../../../controllers/lecturer/useLecturerSubmissionListController'
 import { EmptyState } from '../../components/shared/EmptyState'
 import { ErrorState } from '../../components/shared/ErrorState'
+import { InfoHeader } from '../../components/shared/InfoHeader'
 import { StatusBadge } from '../../components/shared/StatusBadge'
 import { LecturerBulkActionBar } from '../../components/lecturer/LecturerBulkActionBar'
 import { LecturerFilterToolbar } from '../../components/lecturer/LecturerFilterToolbar'
 import { LecturerPaginationBar } from '../../components/lecturer/LecturerPaginationBar'
 import { LecturerQueueTabs } from '../../components/lecturer/LecturerQueueTabs'
 import { LecturerRowActions } from '../../components/lecturer/LecturerRowActions'
-import { LecturerSavedViewBar } from '../../components/lecturer/LecturerSavedViewBar'
-import { LecturerStatsRow } from '../../components/lecturer/LecturerStatsRow'
 import { LecturerTableShell } from '../../components/lecturer/LecturerTableShell'
 import { LecturerTableSkeleton } from '../../components/lecturer/LecturerTableSkeleton'
 import { LecturerPortalLayout } from '../../layouts/LecturerPortalLayout'
@@ -39,28 +38,21 @@ export function LecturerSubmissionListPage({ dataState, assignmentId }: Lecturer
 
   return (
     <LecturerPortalLayout frame={model.frame}>
-      <section className="student-page-body">
-        <div className="workflow-command-bar">
-          <div className="workflow-command-copy">
-            <p className="portal-page-kicker">Hàng chấm bài</p>
-            <h2>Hàng chấm tập trung theo trạng thái xử lý</h2>
-            <p>
-              Hàng chấm này được tối ưu cho giảng viên tìm đúng bài cần chấm, bài nộp trễ và các bài cần phản hồi mà
-              không phải lục lại từ danh sách bài tập.
-            </p>
-          </div>
-
-          <div className="workflow-command-actions portal-button-row">
-            <a className="portal-outline-button" href="?portal=lecturer&page=assignments">
-              Về bài tập
-            </a>
-            <a className="portal-primary-button" href="?portal=lecturer&page=submission-list&view=ungraded">
-              Chỉ xem chưa chấm
-            </a>
-          </div>
-        </div>
-
-        <LecturerStatsRow items={model.stats} />
+      <div className="page-workspace">
+        <InfoHeader
+          title="Hàng chấm bài"
+          stats={model.stats.map((s) => ({ label: s.label, value: s.value }))}
+          actions={
+            <>
+              <a className="portal-outline-button" href="?portal=lecturer&page=assignments">
+                Về bài tập
+              </a>
+              <a className="portal-primary-button" href="?portal=lecturer&page=submission-list&view=ungraded">
+                Chỉ xem chưa chấm
+              </a>
+            </>
+          }
+        />
 
         <LecturerQueueTabs
           tabs={model.tabs.map((tab) => ({
@@ -68,19 +60,6 @@ export function LecturerSubmissionListPage({ dataState, assignmentId }: Lecturer
             isActive: model.filters.view === tab.id,
             onClick: () => model.setQuery({ view: tab.id, page: 1 }),
           }))}
-        />
-
-        <LecturerSavedViewBar
-          views={[
-            { id: 'all', label: 'Tất cả', isActive: model.filters.view === 'all', onClick: () => model.setQuery({ view: 'all' }) },
-            {
-              id: 'ungraded',
-              label: 'Chưa chấm',
-              isActive: model.filters.view === 'ungraded',
-              onClick: () => model.setQuery({ view: 'ungraded' }),
-            },
-            { id: 'late', label: 'Nộp trễ', isActive: model.filters.view === 'late', onClick: () => model.setQuery({ view: 'late' }) },
-          ]}
         />
 
         <LecturerFilterToolbar
@@ -229,7 +208,7 @@ export function LecturerSubmissionListPage({ dataState, assignmentId }: Lecturer
           onPageChange={(page) => model.setQuery({ page })}
           onPageSizeChange={(pageSize) => model.setQuery({ pageSize, page: 1 })}
         />
-      </section>
+      </div>
     </LecturerPortalLayout>
   )
 }

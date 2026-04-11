@@ -1,4 +1,4 @@
-import type { SubmissionStatus } from '../../models/assignment/assignment.types'
+﻿import type { SubmissionStatus } from '../../models/assignment/assignment.types'
 import type { LecturerPageFrame } from '../../models/lecturer/lecturer.types'
 import type { DataState, StatusTone } from '../../models/shared/portal.types'
 import { assignmentsMock, submissionsMock } from '../../models/assignment/assignment.mock'
@@ -134,7 +134,6 @@ function getGradingMeta(score: number | undefined): { label: string; tone: Statu
   if (score === undefined) {
     return { label: 'Chưa chấm', tone: 'warning' }
   }
-
   return { label: 'Đã chấm', tone: 'success' }
 }
 
@@ -149,17 +148,17 @@ export function useLecturerSubmissionDetailController(
 
   const frame: LecturerPageFrame = {
     shell,
-    pageTitle: 'Không gian chấm bài',
-    pageDescription: 'Tập trung xem bài làm, rubric và phản hồi trong cùng một không gian xử lý liên tục.',
+    pageTitle: 'Chi tiết bài nộp',
+    pageDescription: 'Xem từng phiên bản bài nộp, điểm số và luồng phản hồi trong một màn hình.',
     breadcrumbs: [
       { label: 'Trang chủ', href: '?portal=lecturer&page=dashboard' },
       {
-        label: 'Queue bài nộp',
+        label: 'Hàng chấm bài',
         href: assignment
           ? `?portal=lecturer&page=submission-list&assignmentId=${assignment.id}`
           : '?portal=lecturer&page=submission-list',
       },
-      { label: 'Chấm bài' },
+      { label: 'Chi tiết bài nộp' },
     ],
   }
 
@@ -205,7 +204,6 @@ export function useLecturerSubmissionDetailController(
   const feedback = feedbackThreads.find((thread) => thread.submissionId === submission.id)
   const feedbackThread = feedback?.messages.map((message) => {
     const author = getUserById(message.authorId)
-
     return {
       id: message.id,
       authorName: author?.fullName ?? message.authorId,
@@ -228,8 +226,8 @@ export function useLecturerSubmissionDetailController(
     },
     {
       id: 'late-policy',
-      label: 'Chính sách trễ hạn',
-      value: assignment.allowLateSubmission ? 'Cho phép nộp trễ' : 'Không cho phép nộp trễ',
+      label: 'Nộp trễ',
+      value: assignment.allowLateSubmission ? 'Có cho phép' : 'Không cho phép',
       tone: assignment.allowLateSubmission ? 'info' : 'neutral',
     },
     {

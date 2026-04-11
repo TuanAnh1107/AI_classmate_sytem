@@ -1,10 +1,10 @@
 ﻿import type { DataState } from '../../../models/shared/portal.types'
 import { useLecturerAssignmentEditController } from '../../../controllers/lecturer/useLecturerAssignmentEditController'
+import { LecturerAssignmentWizard } from '../../components/lecturer/LecturerAssignmentWizard'
 import { EmptyState } from '../../components/shared/EmptyState'
 import { ErrorState } from '../../components/shared/ErrorState'
 import { LoadingState } from '../../components/shared/LoadingState'
 import { LecturerPortalLayout } from '../../layouts/LecturerPortalLayout'
-import { LecturerAssignmentWizard } from '../../components/lecturer/LecturerAssignmentWizard'
 
 type LecturerAssignmentEditPageProps = {
   dataState: DataState
@@ -49,7 +49,7 @@ export function LecturerAssignmentEditPage({ dataState, assignmentId }: Lecturer
     submissionFormats: model.assignment.allowedSubmissionFormats.join(', '),
     maxFileSize: '20MB',
     resubmissionPolicy: model.assignment.allowLateSubmission ? 'once' : 'none',
-    studentInstruction: 'Vui lòng nộp bài đúng hạn và mô tả rõ từng phần trả lời.',
+    studentInstruction: 'Sinh viên nộp bài đúng hạn và mô tả rõ nội dung bài làm.',
     attachmentNote: '',
   }
 
@@ -66,9 +66,7 @@ export function LecturerAssignmentEditPage({ dataState, assignmentId }: Lecturer
           rubricNote: question.rubric[0]?.detail ?? '',
           maxScore: question.rubric.reduce((sum, item) => sum + item.maxScore, 0),
         }))}
-        questionBank={model.questionBank}
         initialDraft={initialDraft}
-        initialSelectedQuestionIds={model.assignment.questions.map((question) => question.id)}
       />
     </LecturerPortalLayout>
   )

@@ -1,13 +1,12 @@
-﻿import { useState } from 'react'
+﻿import { useMemo, useState } from 'react'
 import type { DataState } from '../../../models/shared/portal.types'
 import { useLecturerSubmissionDetailController } from '../../../controllers/lecturer/useLecturerSubmissionDetailController'
 import { buildLecturerPortalHref } from '../../../models/lecturer/lecturer.mappers'
-import { CollapsibleSection } from '../../components/shared/CollapsibleSection'
-import { ContentPanel } from '../../components/shared/ContentPanel'
 import { EmptyState } from '../../components/shared/EmptyState'
 import { ErrorState } from '../../components/shared/ErrorState'
+import { InfoHeader } from '../../components/shared/InfoHeader'
 import { LoadingState } from '../../components/shared/LoadingState'
-import { StatusBadge } from '../../components/shared/StatusBadge'
+import { PortalSectionTabs } from '../../components/shared/PortalSectionTabs'
 import { LecturerPortalLayout } from '../../layouts/LecturerPortalLayout'
 
 type LecturerSubmissionDetailPageProps = {
@@ -15,13 +14,15 @@ type LecturerSubmissionDetailPageProps = {
   submissionId?: string
 }
 
+type LeftTabId = 'content' | 'history' | 'rubric' | 'feedback'
+
 export function LecturerSubmissionDetailPage({ dataState, submissionId }: LecturerSubmissionDetailPageProps) {
   const model = useLecturerSubmissionDetailController(submissionId, dataState)
 
   if (model.state === 'loading') {
     return (
       <LecturerPortalLayout frame={model.frame}>
-        <LoadingState />
+        <LoadingState description="Đang tải chi tiết bài nộp." />
       </LecturerPortalLayout>
     )
   }
@@ -42,115 +43,138 @@ export function LecturerSubmissionDetailPage({ dataState, submissionId }: Lectur
     )
   }
 
-  const sub = model.submission
-  const [scoreDraft, setScoreDraft] = useState(sub.scoreValue)
-  const [feedbackDraft, setFeedbackDraft] = useState(sub.feedback ?? '')
+  return <SubmissionDetailBody model={model} />
+}
+
+function SubmissionDetailBody({ model }: { model: ReturnType<typeof useLecturerSubmissionDetailController> }) {
+  const submission = model.submission!
+  const [activeLeftTab, setActiveLeftTab] = useState<LeftTabId>('content')
+  const [scoreDraft, setScoreDraft] = useState(submission.scoreValue)
+  const [feedbackDraft, setFeedbackDraft] = useState(submission.feedback ?? '')
   const prevHref = model.prevId ? buildLecturerPortalHref('submission-detail', { submissionId: model.prevId }) : undefined
   const nextHref = model.nextId ? buildLecturerPortalHref('submission-detail', { submissionId: model.nextId }) : undefined
 
+  const leftTabs = useMemo(
+    () => [
+      { id: 'content', label: 'Bài nộp' },
+      { id: 'history', label: 'Phiên bản', countLabel: String(model.attempts?.length ?? 0) },
+      { id: 'rubric', label: 'Rubric', countLabel: String(model.rubric?.length ?? 0) },
+      { id: 'feedback', label: 'Phản hồi', countLabel: String(model.feedbackThread?.length ?? 0) },
+    ],
+    [model.attempts?.length, model.feedbackThread?.length, model.rubric?.length],
+  )
+
   return (
     <LecturerPortalLayout frame={model.frame}>
-      <div className="page-title-bar">
-        <div>
-          <h1>{sub.studentName}</h1>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{sub.studentCode}</span>
-            <StatusBadge label={sub.submissionStatusLabel} tone={sub.submissionTone} />
-            <StatusBadge label={sub.gradingStatusLabel} tone={sub.gradingTone} />
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Nộp: {sub.submittedAtLabel}</span>
-          </div>
-        </div>
-        <div className="page-title-bar-actions">
-          {prevHref ? (
-            <a className="portal-outline-button" href={prevHref}>
-              ← Trước
-            </a>
-          ) : null}
-          {nextHref ? (
-            <a className="portal-outline-button" href={nextHref}>
-              Sau →
-            </a>
-          ) : null}
-        </div>
-      </div>
+      <div className="page-workspace">
+        <InfoHeader
+          title={submission.studentName}
+          subtitle={`${submission.studentCode} · Nộp lúc ${submission.submittedAtLabel}`}
+          badges={[
+            { label: submission.submissionStatusLabel, tone: submission.submissionTone },
+            { label: submission.gradingStatusLabel, tone: submission.gradingTone },
+          ]}
+          actions={
+            <>
+              <a className="portal-outline-button" href={submission.assignmentHref}>
+                Bài tập
+              </a>
+              <a className="portal-outline-button" href={submission.queueHref}>
+                Hàng chấm
+              </a>
+              {prevHref ? <a className="portal-outline-button" href={prevHref}>Trước</a> : null}
+              {nextHref ? <a className="portal-outline-button" href={nextHref}>Sau</a> : null}
+            </>
+          }
+        />
 
-      <div className="student-page-body portal-page-transition">
         <div className="grading-workspace">
           <div className="grading-main">
-            <ContentPanel title={sub.assignmentTitle}>
-              <div className="grading-content-body">
-                <p>{sub.contentText}</p>
+            <PortalSectionTabs items={leftTabs} activeId={activeLeftTab} onChange={(id) => setActiveLeftTab(id as LeftTabId)} />
 
-                {sub.attachmentUrls.length ? (
-                  <ul className="portal-attachment-list">
-                    {sub.attachmentUrls.map((url) => (
-                      <li key={url}>{url}</li>
+            {activeLeftTab === 'content' ? (
+              <div className="tab-panel">
+                <div className="grading-content-body">
+                  <h3>{submission.assignmentTitle}</h3>
+                  <p>{submission.contentText}</p>
+
+                  {submission.attachmentUrls.length ? (
+                    <ul className="portal-attachment-list">
+                      {submission.attachmentUrls.map((url) => (
+                        <li key={url}>{url}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="portal-muted-text">Không có tệp đính kèm cho bài nộp này.</p>
+                  )}
+                </div>
+              </div>
+            ) : null}
+
+            {activeLeftTab === 'history' ? (
+              <div className="tab-panel">
+                {model.attempts?.length ? (
+                  <div className="grading-attempt-list">
+                    {model.attempts.map((attempt) => (
+                      <div key={attempt.id} className={`grading-attempt-item${attempt.isCurrent ? ' is-current' : ''}`}>
+                        <div>
+                          <strong>{attempt.submittedAtLabel}</strong>
+                          <span>{attempt.statusLabel}</span>
+                        </div>
+                        <em>{attempt.scoreLabel}</em>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 ) : (
-                  <p className="portal-muted-text">Không có tệp đính kèm cho bài nộp này.</p>
+                  <EmptyState title="Chỉ có một lần nộp" description="Không có phiên bản cũ hơn cho bài nộp này." />
                 )}
               </div>
-            </ContentPanel>
+            ) : null}
 
-            <CollapsibleSection title="Lịch sử nộp" count={model.attempts?.length ?? 0}>
-              {model.attempts?.length ? (
-                <div className="grading-attempt-list">
-                  {model.attempts.map((attempt) => (
-                    <div key={attempt.id} className={`grading-attempt-item${attempt.isCurrent ? ' is-current' : ''}`}>
-                      <div>
-                        <strong>{attempt.submittedAtLabel}</strong>
-                        <span>{attempt.statusLabel}</span>
+            {activeLeftTab === 'rubric' ? (
+              <div className="tab-panel">
+                {model.rubric?.length ? (
+                  <div className="grading-rubric-list">
+                    {model.rubric.map((item) => (
+                      <div key={item.id} className="grading-rubric-item">
+                        <div>
+                          <strong>{item.label}</strong>
+                          <span>{item.detail}</span>
+                        </div>
+                        <em>{item.maxScore} điểm</em>
                       </div>
-                      <em>{attempt.scoreLabel}</em>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState title="Chỉ có một lần nộp" description="Không có phiên bản nộp trước đó." />
-              )}
-            </CollapsibleSection>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState title="Chưa có rubric" description="Bài tập này chưa cấu hình rubric chi tiết." />
+                )}
+              </div>
+            ) : null}
 
-            <CollapsibleSection title="Rubric" count={model.rubric?.length ?? 0}>
-              {model.rubric?.length ? (
-                <div className="grading-rubric-list">
-                  {model.rubric.map((item) => (
-                    <div key={item.id} className="grading-rubric-item">
-                      <div>
-                        <strong>{item.label}</strong>
-                        <span>{item.detail}</span>
+            {activeLeftTab === 'feedback' ? (
+              <div className="tab-panel">
+                {model.feedbackThread?.length ? (
+                  <div className="feedback-message-list">
+                    {model.feedbackThread.map((message) => (
+                      <div key={message.id} className={`feedback-message-card role-${message.authorRole}`}>
+                        <header>
+                          <strong>{message.authorName}</strong>
+                          <span>{message.createdAt}</span>
+                        </header>
+                        <p>{message.content}</p>
                       </div>
-                      <em>{item.maxScore} điểm</em>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState title="Chưa có rubric" description="Bài tập này chưa có rubric chi tiết." />
-              )}
-            </CollapsibleSection>
-
-            <CollapsibleSection title="Phản hồi" count={model.feedbackThread?.length ?? 0}>
-              {model.feedbackThread?.length ? (
-                <div className="feedback-message-list">
-                  {model.feedbackThread.map((message) => (
-                    <div key={message.id} className={`feedback-message-card role-${message.authorRole}`}>
-                      <header>
-                        <strong>{message.authorName}</strong>
-                        <span>{message.createdAt}</span>
-                      </header>
-                      <p>{message.content}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState title="Chưa có trao đổi" description="Phản hồi sẽ hiển thị ở đây khi giảng viên và sinh viên bắt đầu trao đổi." />
-              )}
-            </CollapsibleSection>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState title="Chưa có phản hồi" description="Khi giảng viên hoặc sinh viên trao đổi, nội dung sẽ hiển thị tại đây." />
+                )}
+              </div>
+            ) : null}
           </div>
 
           <div className="grading-side">
             <div className="grading-panel">
-              <h3>Chấm điểm</h3>
+              <h3>Chấm điểm và phản hồi</h3>
 
               <div className="portal-form-stack">
                 <div className="portal-form-field">
@@ -161,19 +185,19 @@ export function LecturerSubmissionDetailPage({ dataState, submissionId }: Lectur
                     value={scoreDraft}
                     onChange={(event) => setScoreDraft(event.target.value)}
                     min={0}
-                    max={sub.maxScoreValue}
+                    max={submission.maxScoreValue}
                   />
-                  <p className="portal-form-help">Tối đa: {sub.maxScoreValue}</p>
+                  <p className="portal-form-help">Tối đa: {submission.maxScoreValue}</p>
                 </div>
 
                 <div className="portal-form-field">
-                  <label className="portal-form-label">Nhận xét</label>
+                  <label className="portal-form-label">Phản hồi</label>
                   <textarea
                     className="portal-textarea"
                     rows={4}
                     value={feedbackDraft}
                     onChange={(event) => setFeedbackDraft(event.target.value)}
-                    placeholder="Nhập nhận xét cho sinh viên..."
+                    placeholder="Nhập nhận xét cho sinh viên."
                   />
                 </div>
               </div>
@@ -187,7 +211,7 @@ export function LecturerSubmissionDetailPage({ dataState, submissionId }: Lectur
                 ))}
                 <div className="grading-panel-helper">
                   <span>Lớp</span>
-                  <strong>{sub.classLabel}</strong>
+                  <strong>{submission.classLabel}</strong>
                 </div>
               </div>
 
